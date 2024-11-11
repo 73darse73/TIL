@@ -552,6 +552,7 @@ console.log(evaluation.value)  //①
 </template>
 ```
 
+- 非同期処理は使えない
 - computedとtemplateどっちを使えばいいの？
     - computedを使うべき
         - templateや他の関数でevalutionが読まれていなかった時、
@@ -560,4 +561,64 @@ console.log(evaluation.value)  //①
         - その度にsctiptの読み込みも１から走る
 
 - watcher
-    -
+    - 変更を検知して処理を行う専用の機能
+        - watchEffect
+        
+        ```jsx
+        <script setup>
+        import { ref, watchEffect } from 'vue'
+        const count = ref(0)
+        watchEffect(() => {
+        	setTimeout(() => {
+        		console.log('after 1 second')
+        	}, 1000)
+        	console.log(count.value)
+        	conut.value = 'hello'
+        })
+        </script>
+        
+        <template>
+        	<p>{{ count }}</p>
+        	<button @click="count++">+1</button> //③scoreの値が更新される&evaluationが動く
+        </template>
+        ```
+        
+        - computedと違って非同期処理ができる
+        - 処理を行った時にcount.valueを読み取らないと監視されない。
+            - この場合console.log(count.value)を削除したり、非同期の中に入れたら監視されなくなる
+        - watch
+        
+        ```jsx
+        <script setup>
+        import { ref, watchEffect, watch } from 'vue'
+        const count1 = ref(0)
+        const count2 = ref(0)
+        const count3 = ref(0)
+        watch(count1, ()=> {
+        	console.log('watch')
+        	console.lot(count1.value,count2.value,count3.value)
+        })
+        watch(count1, (newValue,oldValue)=> {
+        	console.log('watch')
+        	console.lot('vewValue',newValue)
+        })
+        watchEffect(() => {
+        	console.log('watchEffect')
+        	console.lot(count1.value,count2.value,count3.value)
+        })
+        </script>
+        
+        <template>
+        	<p>{{ count }}</p>
+        	<button @click="count++">+1</button> //③scoreの値が更新される&evaluationが動く
+        </template>
+        ```
+        
+        - watchEffectとの違い
+            - 監視したい変数を明示的にするかどうか
+            - watchはcount1のみ変更された時に実行される。
+            - watchEffectはcount1,count2,count3が変更された時に実行される。
+            - 明示的にしたい場合はwatch,コードを短くしたいときなどはwatchEffect
+        - 監視対象の変更前と変更後の値を取得できる
+        - 第一引数に配列を入れて複数対象を監視対象にすることができる。
+        - 第一引数に関数を入れることができる。
