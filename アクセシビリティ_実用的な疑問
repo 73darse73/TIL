@@ -1,0 +1,35 @@
+- brタグはどう使うべき？
+    - 現象
+        - brタグを使うと「空のグループ」と読み上げられる。
+    - 考察
+        - pタグを使う
+            - 段落変わるなら当たり前にこれするけど、段落変わらないなら変。
+        - aria-hidden=”true”
+            - これが一番よさそう
+        - cssで調整
+            - white-space: nowrap;
+                
+                ```html
+                <p><a hlef="#">お知らせを<span>もっとみる</span></a></p>
+                ```
+                
+                ```css
+                p > a > span {
+                    white-space: nowrap;
+                }
+                ```
+                
+            - display: inline-block;
+                
+                ```html
+                <p><a hlef="#"><span>お知らせを</span><span>もっとみる</span></a></p>
+                ```
+                
+                ```css
+                p > a > span {
+                    display: inline-block;
+                }
+                ```
+                
+    - 社外の人に聞いてみた
+        - brタグでカラのグループと呼ばれるのは問題なし。むしろユーザーが改行に気づけるから取らない方が良い。
