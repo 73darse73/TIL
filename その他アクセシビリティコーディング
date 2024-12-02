@@ -1,2 +1,10 @@
 - ボタンはaタグではなくbuttonタグで実装する。
     - aタグで行うと、読み上げ時に「リンク」と読み上げてしまう。
+- canvasは読み上げ機能がアクセスできない
+- lighthouseのチェックは怪しい
+- AccessibilityVisualizer便利
+- web developer
+    - disabled all styles
+    - display alt attributes
+    - replace images with alt attributes
+-
