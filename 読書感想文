@@ -29,3 +29,34 @@
             - 環境の整備
                 - するように努めなければならない（努力義務）
                 - 例：HPが読み上げられるように修正しておく。
+- [アクセシビリティオーバーレイ](https://qiita.com/mu_tomoya/items/8bd2696c1ce79db53b3c)
+    - なにもの？
+        - wcagに準拠したWebのアクセシビリティを提供するSaasのこと。
+            - Saasとは
+                - ソフトウェアを自分のコンピュータにインストールするのではなく、オンラインでアクセスして利用するもの
+            - 例
+                - https://qiita.com/mu_tomoya/items/8bd2696c1ce79db53b3c
+        - JavaScriptを読み込むコードを置くだけでアクセシビリティに対応できる
+    - 取り入れるべき？
+        - デジ庁は非水準
+        - wcagの基準に適合しているわけではない
+- [障害者雇用率制度](https://www.mhlw.go.jp/stf/seisakunitsuite/bunya/koyou_roudou/koyou/shougaishakoyou/index.html)
+    - 従業員が一定数以上の事業主は、身体障害者・精神障害者・知的障害者の割合を「法定雇用率」以上にする必要がある。
+    - 民間企業の「法定雇用率」は2.3%。
+    - 従業員が43.5人雇用している場合は障害者を1人以上雇用しなければならない。
+
+- 「名前」と「役割」
+    - UIのアクセシビリティを担保する上で大事になる[セマンティクス](https://developer.mozilla.org/ja/docs/Glossary/Semantics)に「名前」と「役割」がある。
+        - 名前
+            - 対象を識別したり、目的を理解したりできる。
+        - 役割
+            - ユーザーが対象の振る舞い（ボタンであれば押せるなど）を予測できる。
+    - スクリーンリーダー使用者
+        - 「追加、ボタン」
+        - いい例
+        
+        ```html
+        <div class="button">
+            <svg class="Icon -add" viewBox="0 0 512 512"><path d="M505..."></path></svg>
+        </div>
+        ```
