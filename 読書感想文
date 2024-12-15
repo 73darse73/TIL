@@ -60,3 +60,18 @@
             <svg class="Icon -add" viewBox="0 0 512 512"><path d="M505..."></path></svg>
         </div>
         ```
+        
+
+- 状態
+    - 何かを入力するUIには「状態」が必要
+    - 例
+        
+        ```html
+        <label>
+          <input type="checkbox" checked="checked" />
+          同意する
+        </label>
+        ```
+        
+- wai-aria
+    - html
