@@ -56,6 +56,14 @@
         - いい例
         
         ```html
+        <button class="button">
+            <img src="image/icon/add.png" alt="追加" />
+        </button>
+        ```
+        
+        - 悪い例
+        
+        ```html
         <div class="button">
             <svg class="Icon -add" viewBox="0 0 512 512"><path d="M505..."></path></svg>
         </div>
@@ -64,7 +72,11 @@
 
 - 状態
     - 何かを入力するUIには「状態」が必要
-    - 例
+        - マシンにはそのUIが何をするものかがわかる必要がわからない
+        →[セマンティクス](https://developer.mozilla.org/ja/docs/Glossary/Semantics)にする必要がある
+        - checkedなどで、チェックされているのがどの項目か状態がわかるようになる
+        - 
+    - いい例
         
         ```html
         <label>
@@ -73,8 +85,15 @@
         </label>
         ```
         
+    - 悪い例
+        
+        ```html
+        <span class="checkbox-wrapper" onclick="toggleCheck()">
+            <span class="checkbox -checked"></span>
+            <span>同意する</span>
+        </span>
+        ```
+        
 - wai-aria
     - html
-勉強してるけどハワイなのでPC持ってきてない
-ほんとは一昨日もしたよ
-今から飛行機乗って日付変更線越えるから念のためコミット
+    - 勉強したけどPCないからきつい🥲
