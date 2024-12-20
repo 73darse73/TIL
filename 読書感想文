@@ -75,7 +75,6 @@
         - マシンにはそのUIが何をするものかがわかる必要がわからない
         →[セマンティクス](https://developer.mozilla.org/ja/docs/Glossary/Semantics)にする必要がある
         - checkedなどで、チェックされているのがどの項目か状態がわかるようになる
-        - 
     - いい例
         
         ```html
@@ -95,5 +94,22 @@
         ```
         
 - wai-aria
-    - html
-    - 勉強したけどPCないからきつい🥲
+    - htmlの要素や属性だけじゃ補えないせマンティクスを補完するのがWAI-ARIA
+        - WAI-ARIAロール
+            - 役割を補完する
+        - WAI-ARIAステート/プロパティ
+            - 状態やプロパティを補完する
+    - 良い例
+        
+        ```html
+        <div role="tablist">
+            <button role="tab" aria-selected="true" id="search-tab">検索して追加</button>
+            <button role="tab" aria-selected="false" tabindex="-1" id="file-tab">ファイルから追加</button>
+        </div>
+        <div role="tabpanel" aria-labelledby="search-tab" aria-hidden="false">
+            省略
+        </div>
+        <div role="tabpanel" aria-labelledby="file-tab" aria-hidden="true">
+            省略
+        </div>
+        ```
