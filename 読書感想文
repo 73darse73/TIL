@@ -99,7 +99,7 @@
             - 役割を補完する
         - WAI-ARIAステート/プロパティ
             - 状態やプロパティを補完する
-    - 良い例
+    - 例
         
         ```html
         <div role="tablist">
@@ -113,3 +113,69 @@
             省略
         </div>
         ```
+        
+        - 役割
+            - role="tablist"
+            - role="tab"
+            - role="tabpanel"
+        - 状態
+            - aria-selected
+            - aria-hidden
+        - 名前
+            - aria-labelledby
+        
+        ```html
+        <div role="button" class="Button">
+            <svg role="img" aria-label="追加" class="Icon -add" viewBox="0 0 512 512">
+                <path d="M505 ..." />
+            </svg>
+        </div>
+        ```
+        
+        - 役割
+            - role=”button”
+            - role=”img”
+        - 名前
+            - aria-label
+        
+        ```html
+        <span class="checkbox-wrapper" onclick="toggleCheck();">
+            <span role="checkbox" aria-checked="true" aria-labelledby="label" class="checkbox -checked"></span>
+            <span id="label">同意する</span>
+        </span>
+        ```
+        
+        - 役割
+            - role="checkbox"
+        - 状態
+            - aria-checked
+        - 名前
+            - aria-labelledby
+    - WAI-ARIAよりもHTMLネイティブセマンティクスが優れている理由
+        - htmlはデフォルトのユーザースタイルシートを持っている
+            - 最初からdivで作ってwai-ariaでセマンティクスを付与したくなるかも
+            - ↑よくない
+        - wai-ariaでセマンティクスを補完できても振る舞いまでは再現できない
+            - 例
+                - divにrole=”button”を付与してもキーボードフォーカスが当たらない
+                - aタグであれば、コンテキストメニューの表示や左下に遷移先のURLが表示される
+        - wai-ariaを理解できるUAや支援技術が限られている
+- HTMLとWAI-ARIAとAOM(アクセシビリティオブジェクトモデル/ツリー)
+    - 名前、役割、状態といったセマンティクスは、多くの支援技術やOSが用意しているアクセシビリティAPIを介してOS上のアプリケーションとやりとりしている。
+        - アクセシビリティAPIの例
+            - windows
+                - Microsoft Active Accessibility
+                - Aindows Automation API
+            - mac
+                - NSAccessibility
+    - OS上のアプリケーションはアプリケーションのウィンドウをルートノードとしたAOMを生成する。
+        - 個々のインタラクティブなインターフェースやテキストノードが含まれている。
+        - このモデルをAPIを通じて公開し、支援技術が読み取り操作することでアプリケーションを操作する。
+        - ブラウザは自身が持つ検索ボタンやインターフェースだけでなく、WebページもAOMに変換し、APIを通じて公開している。
+        →ユーザーが支援技術を通じてWebページにアクセスできる。
+    - WebコンテンツからAOMが生成される流れ
+        - ブラウザが画面上に表示するインターフェースの表示のためDOMを生成。
+        - CSSからCSSオブジェクトモデルを生成。
+        - 二つのオブジェクトモデルを組み合わせる。
+        - レンダリングツリーを生成してレイアウト計算を行う。
+        - 画面に描画。
