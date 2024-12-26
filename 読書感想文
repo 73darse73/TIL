@@ -179,4 +179,41 @@
         - 二つのオブジェクトモデルを組み合わせる。
         - レンダリングツリーを生成してレイアウト計算を行う。
         - 画面に描画。
-        - a
+            - ここでAOMの生成処理も一緒にされる。
+    - 詳細な例
+        
+        ```html
+        <button>
+            <img src="/image/icon/add.png" alt="">
+            追加
+        </button>
+        <p>追加しました</p>
+        
+        <style>
+            p {
+                display: none; /* 図2-1-8の場合 */
+                display: block; /* 図2-1-9の場合 */
+            }
+        </style>
+        ```
+        
+    
+    ![IMG_5372.jpeg](https://prod-files-secure.s3.us-west-2.amazonaws.com/be89dc3c-6442-47ed-869e-31119696b207/44a0cd91-8210-4db0-bc9f-ac6ca3ae6921/IMG_5372.jpeg)
+    
+- WAI-ARIAの種類
+    - AOMのプロパティに対応した語彙がある。
+        - 主な例
+            - Nameプロパティ
+                - オブジェクトの名前（アクセシブルな名前）
+                    - テキストノードやlabel要素のテキスト
+                - aria-labelやaria-labelledbyなどがある
+            - Rollプロパティ
+                - オブジェクトの役割（ロール）
+                    - これにより支援技術はユーザーに操作を提示したりサポートできたりできる。
+                        - buttonであればクリック可能であることを伝える。
+                    - role=””で指定できる。
+            - Descriptionプロパティ
+                - オブジェクトの説明
+                    - Nameプロパティより詳細な説明を与える。
+                        - htmlではtitle属性で与えることができる。
+                    - aria-describedby、aria-description(次の仕様で検討されている。)などがある。
