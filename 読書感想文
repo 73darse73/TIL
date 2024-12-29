@@ -1,3 +1,7 @@
+## Webアクセシビリティとは
+
+---
+
 - 今では多くの人がスマートフォンを持ち、長時間のインターネット利用をしている。
 アクセシビリティを高めれば、サービスにアクセスできるユーザーが大きく増加する。
 →今後のサービス運営において大きなメリット
@@ -44,6 +48,12 @@
     - 従業員が一定数以上の事業主は、身体障害者・精神障害者・知的障害者の割合を「法定雇用率」以上にする必要がある。
     - 民間企業の「法定雇用率」は2.3%。
     - 従業員が43.5人雇用している場合は障害者を1人以上雇用しなければならない。
+
+## Webアクセシビリティの基礎
+
+---
+
+### 基礎となるマシンリーダブルを理解する
 
 - 「名前」と「役割」
     - UIのアクセシビリティを担保する上で大事になる[セマンティクス](https://developer.mozilla.org/ja/docs/Glossary/Semantics)に「名前」と「役割」がある。
@@ -211,9 +221,37 @@
                 - オブジェクトの役割（ロール）
                     - これにより支援技術はユーザーに操作を提示したりサポートできたりできる。
                         - buttonであればクリック可能であることを伝える。
-                    - role=””で指定できる。
+                - role=””で指定できる。
             - Descriptionプロパティ
                 - オブジェクトの説明
                     - Nameプロパティより詳細な説明を与える。
                         - htmlではtitle属性で与えることができる。
-                    - aria-describedby、aria-description(次の仕様で検討されている。)などがある。
+                - aria-describedby、aria-description(次の仕様で検討されている。)などがある。
+            - Expandedプロパティ
+                - オブジェクトが展開されているかどうかを表すプロパティ
+                - aria-expanded
+                    - aria-controlls等と共に、アコーディオン等で使われる
+                    - https://temari.co.jp/blog/2021/03/01/accessibility-8/
+            - 他にもたくさん種類がある
+                - Checkedプロパティ、Disabledプロパティ、Busyプロパティなど
+- 優先順位
+    - WAI-ARIA > CSS > HTML
+        - 例
+            
+            ```html
+            <table style="display:contents" roll="table"></table>
+            ```
+            
+            - rollプロパティ
+                - HTMLから「table」となる
+                - CSSで「display:contents」が指定されている
+                    - 表構造でなくなる可能性がある
+                    - ブラウザによってはrollプロパティをtableではない値に変更
+                - WAI-ARIAのrollにtableが指定されている
+                - 最終的にrollプロパティは「table」となる
+- 組み合わせ
+    - HTMLではchecked属性がinput要素のcheckboxタイプでしか有効にならないように、rollとaria属性の組み合わせもある程度決められている。
+    - HTMLとWAI-ARIAの組み合わせにも許可されている組み合わせがある。
+        - [ARIA in HTML](https://momdo.github.io/html-aria/)という仕様にまとまっている
+
+### キーボード操作の基本
