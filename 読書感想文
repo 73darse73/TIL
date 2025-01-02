@@ -255,3 +255,58 @@
         - [ARIA in HTML](https://momdo.github.io/html-aria/)という仕様にまとまっている
 
 ### キーボード操作の基本
+
+- 概要
+    - tabキーや、enterキー、spaceキー等でキーボード操作ができる
+    - GUIではマウスなどのポインティングバイスを主なツールとするが、
+    キーボード操作で完結できると良い。
+- よくある事例
+    - 事例1 キーボード操作できない（インタラクティブ要素を用いていない）
+        - 適切なHTMLの要素を使用していないケース
+        - インタラクティブ要素は基本的にキーボード操作可能
+            - [インタラクティブ要素一覧？](https://momdo.github.io/html/dom.html#interactive-content-2)
+                - 例
+                    - button要素
+                    - select要素
+                    - a要素（href属性がある場合）
+        - 例
+            - role=”button”をつけてもdiv要素はフォーカスを受け取れない
+                - 補完されるのはセマンティクスのみで、フォーカスを受け取る振る舞いまでは補完されない
+            
+            ```html
+            <script>
+                const clickButton = (e) => { /* 処理 */ }
+            </script>
+            <div role="button" onclick="clickButton();">追加</div>
+            ```
+            
+    - 事例2 キーボード操作できない（インタラクティブ要素を隠している）
+        - 見た目を変更するためにinput要素をdisplay:none;で隠して、CSSや画像でチェックボックスを描画している場合、マウスではlabel要素をクリックすれば良いがフォーカスは当たらない
+        
+        ```html
+        <label>
+            <input type="checkbox" checked />
+            <span class="Checkbox__wrapper">
+                <svg viewBox="0 0 512 512" width="14">
+                    <path fill="#0770c7" d="省略" />
+                </svg>
+            </span>
+            同意する
+        </label>
+        
+        <style>
+            input {
+                display: none;
+            }
+            input:not(:checked) ~ .Checkbox__wrapper > svg {
+                display: none;
+            }
+        </style>
+        ```
+        
+    - 事例3 キーボードで操作できない（マウスでしか表示されないUI）
+        - マウス操作のみで表示できる領域内にUIがある場合も、その操作をキーボード操作できない。
+            - hoverなど
+    - 事例4 キーボード操作の現在位置がわからない
+        - フォーカスインジケーターを非表示にしているとどこをフォーカスしているのかわからない
+        - outline: none;をを使わないようにする
