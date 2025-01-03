@@ -270,18 +270,48 @@
                     - select要素
                     - a要素（href属性がある場合）
         - 例
-            - role=”button”をつけてもdiv要素はフォーカスを受け取れない
-                - 補完されるのはセマンティクスのみで、フォーカスを受け取る振る舞いまでは補完されない
+            - 問題
+                - role=”button”をつけてもdiv要素はフォーカスを受け取れない
+                    - 補完されるのはセマンティクスのみで、フォーカスを受け取る振る舞いまでは補完されない
             
             ```html
             <script>
                 const clickButton = (e) => { /* 処理 */ }
             </script>
             <div role="button" onclick="clickButton();">追加</div>
+            
+            <!-- 改善1 -->
+            <button onclick="clickButton();">追加</button>
+            
+            <!-- 改善2 -->
+            <div role="button" tabindex="0" onclick="clickButton();">追加</div>
+            
+            <script>
+            	const clickButton = (e) => { /* 処理 */ }
+            	const keyupButton = (e) => { 
+            		if(e.key === 'Enter' || e.key === 'Space') {
+            		  //処理
+            		}
+            	}
+            </script>
             ```
             
+            - 解決策
+                - 改善1
+                    - インタラクティブな要素の活用
+                - 改善2
+                    - インタラクティブな要素が使用できない時はこの改善策
+                    - tabindex属性の活用
+                        - 0以上の数値
+                            - 要素がフォーカスを受け取ることができる
+                        - 負の数
+                            - フォーカスを受け取らない
+                            - DOM API の focus() メソッドを実行してスクリプトからフォーカスを当てることが可能
+                        - タブシーケンス（順番）を制御できるようになる
+                            - 原則 0 か -1 のみ指定
     - 事例2 キーボード操作できない（インタラクティブ要素を隠している）
-        - 見た目を変更するためにinput要素をdisplay:none;で隠して、CSSや画像でチェックボックスを描画している場合、マウスではlabel要素をクリックすれば良いがフォーカスは当たらない
+        - 問題
+            - 見た目を変更するためにinput要素をdisplay:none;やvisibilityプロパティで隠して、CSSや画像でチェックボックスを描画している場合、マウスではlabel要素をクリックすれば良いがフォーカスは当たらない
         
         ```html
         <label>
@@ -302,11 +332,63 @@
                 display: none;
             }
         </style>
+        
+        <!-- 改善1 -->
+        <label>
+            <input type="checkbox" checked />
+            <span class="Checkbox__wrapper">
+                <svg viewBox="0 0 512 512" width="14">
+                    <path fill="#0770c7" d="省略" />
+                </svg>
+            </span>
+            同意する
+        </label>
+        
+        <style>
+            input {
+                display: none;
+            }
+            input:not(:checked) ~ .Checkbox__wrapper > svg {
+                display: none;
+            }
+            input[type="checkbox"]:focus + .Checkbox__wrapper {
+                outline: 2px solid blue;
+            }
+        </style>
         ```
         
+        - 解決策
+            - 改善1
+                - インタラクティブな要素の活用
     - 事例3 キーボードで操作できない（マウスでしか表示されないUI）
-        - マウス操作のみで表示できる領域内にUIがある場合も、その操作をキーボード操作できない。
-            - hoverなど
+        - 問題
+            - マウス操作のみで表示できる領域内にUIがある場合も、その操作をキーボード操作できない。
+                - hoverなど
+        - 解決策
+            - CSSの:hover擬似クラスや、DOMのmouseenterイベントで要素を操作する場合、:focus擬似クラスや:focus-within擬似クラス、focusイベントを併用すればキーボードで要素に到達できる。
     - 事例4 キーボード操作の現在位置がわからない
-        - フォーカスインジケーターを非表示にしているとどこをフォーカスしているのかわからない
-        - outline: none;をを使わないようにする
+        - 問題
+            - フォーカスインジケーターを非表示にしているとどこをフォーカスしているのかわからない
+            - outline: none;をを使わないようにする
+        - 解決策
+            - 大きな理由がなければブラウザのデフォルトのフォーカスインジケーターを表示する。
+            - ブラウザではさまざまなWebページで見やすいように工夫されている。
+                - Chromeでは有色の枠の外に白い枠をつけている
+            - 
+- チェックポイント
+    - [ヒューリスティック](https://www.keyence.co.jp/ss/general/iot-glossary/heuristic.jsp)なチェック（デザイン時）
+        - フォーカスインジケーターを表示する
+    - [ヒューリスティック](https://www.keyence.co.jp/ss/general/iot-glossary/heuristic.jsp)なチェック（実装時）
+        - キーボードでフォーカスできるかチェックする
+        - フォーカスインジケーターが表示されるかチェックする
+        - キーボードで操作を実行できるかチェックする
+    - 自動チェック
+        - キーボードで操作可能かを自動でチェックするのは難しい。
+        - ESLintのプラグインには、非インタラクティブな要素にクリックイベントやマウスイベントのみが付与されていることを検知できるものがある。
+            - elint-plugin-jsx-a11y / eslint-plugin-vuejs-accessibility
+                - click-events-have-key-events
+                    - 非インタラクティブな要素にクリックイベントを付与する場合は、キーボードイベントも付与されているかチェックする
+                    - interactive-supports-focus
+                        - インタラクティブなイベントが付与されている要素がフォーカス可能かチェックする
+                    - mouse-eveents-have-key-events
+                        - mouseover、mouseoutと合わせて、focus、[blur](https://developer.mozilla.org/ja/docs/Web/API/Element/blur_event)イベントが付与されているかチェックする
