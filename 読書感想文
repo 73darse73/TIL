@@ -439,6 +439,21 @@
         - 解決策
             - UIとなる要素にテキストを内包させる
                 - 視覚的にも他の言語への翻訳的にも最もアクセシブルな方法
+                - スペースの都合上テキストを追加しにくい場合
+                    - 内包する画像に代替テキストを入れる
+                        - alt
+                        - aria-label
+                    - label要素でテキストと関連づける
+                    - そのUIに直接aria-label属性をつける
+                        - aria-label属性はAOMのNameプロパティにのみ作用するため、WAI-ARIAを処理できないUAからはアクセスできない
+                            - RPAツールやブラウザを自動で操作するソフトウェアの一部
+                    - Visually Hidden
+                        - 視覚的にのみ隠し、機械には読み取れる形で残すCSSテクニック
+                        - display:none;やvisibility:hidden;だとAOMからも存在しなくなる
+                        - position:absolute;でレイアウト計算から除外、
+                        clip-path:inset(100%)で要素の表示される箇所をなくし、
+                        極小なwidthとheightでクリックされる領域をほとんど影響がない異様にする
+                        - ブラウザによってはwidthやheightが小さすぎて要素を無視してしまうかも
         
         ```html
         <button type="button">
@@ -453,6 +468,13 @@
             </svg>
             <input type="text">
         </label>
+        
+        .visually-hidden {
+        	position: absolute;
+        	width: 1px;
+        	height: 1px;
+        	clip-path: inset(100%);
+        }
         ```
         
     - 事例3 装飾のための視覚表現がテキストデータを持っている
@@ -460,9 +482,10 @@
             - 装飾目的のものにテキストデータがあるとノイズになる可能性がある
                 - 以下の場合、button要素のNameプロパティは「fa fa-plus 追加」となる。
         - 解決策
-            - UIとなる要素にテキストを内包させる
-                - 視覚的にも他の言語への翻訳的にも最もアクセシブルな方法
-                - 
+            - オブジェクトを無視させる
+                - 背景画像として扱う
+                - alt属性の値を空にする
+                - aria-hidden属性を用いる
         
         ```html
         <button type="button">
