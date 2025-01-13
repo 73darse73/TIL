@@ -635,4 +635,60 @@
                 - プレースホルダーの色が薄くて認識しづらい
                 - プレースホルダーとフォームコントロールの値との区別がつかない
                 - フォームコントロールに値を入力した時にプレースホルダーの値が見えなくなってしまう
-            -
+    - 事例2 ラベルと説明の配置がわかりづらい
+        - 問題
+            - 説明がテキストコントロールの後に配置されている
+                - テキスト入力時に説明が画面におさまっておらず、説明に気づかないこともある。
+                - モバイルデバイスユーザー、ロービジョンユーザーでよく起きる
+            - 項目数の多いチェックボックスルガ横に並べられ、接近している
+                - 画面を拡大しているユーザーやロービジョンのユーザーは、グループ全体を見渡すことが難しいため、ラベルとフォームコントロールの関係をより誤解しやすくなる。
+                
+                ![IMG_5525.jpeg](https://prod-files-secure.s3.us-west-2.amazonaws.com/be89dc3c-6442-47ed-869e-31119696b207/4c49f428-254d-439f-9533-05231849b38f/IMG_5525.jpeg)
+                
+    - 事例3 フォームコントロールにラベルと説明が関連づけられていない
+        
+        フォームコントロールにはラベルと説明を関連づける必要がある。
+        
+        - 問題
+            - 説明がない
+            - スクリーンリーダーはフォームコントロールにフォーカスすると、ラベルと説明を読み上げるが、この場合入力前に説明の存在に気づけない
+        
+        ```html
+        <label for="username">ユーザー名</label><span>(半角英数字で入力)</span>
+        <input type="text" id="username">
+        ```
+        
+    - 事例4 グループにラベルと説明が関連づけられていない
+        
+        グループにもラベルと説明を関連づけることが必要な場合がある。
+        
+        - 問題
+            - スクリーンリーダーユーザーがグループがあることに気づけない
+                - 正常な
+                    - 青 ラジオボタン 商品の色（どれか1つを選択） グループ
+                - 現状
+                    - 青 ラジオボタン
+            - tabキーでフォーカス可能な要素のみを拾い読みしている場合、ラベルに気づかない
+        
+        ```html
+        <div>
+            <span>商品の色（どれか1つを選択）</span>
+            <label><input type="radio" name="product-color">青</label>
+            <label><input type="radio" name="product-color">緑</label>
+            <label><input type="radio" name="product-color">黄</label>
+            <label><input type="radio" name="product-color">赤</label>
+        </div>
+        
+        <div>
+            <span>興味のあるトピック（3つまで）</span>
+            <label><input type="checkbox" name="topic">政治</label>
+            <label><input type="checkbox" name="topic">経済</label>
+            <label><input type="checkbox" name="topic">国際</label>
+            <label><input type="checkbox" name="topic">科学</label>
+        </div>
+        ```
+        
+    - 事例5 入力必須の説明が伝わらない
+        - 問題
+            - 入力必須を記号や色のみで表している
+            - 音声だけで聞いている人やフォームの入力に慣れていない人はわからない
