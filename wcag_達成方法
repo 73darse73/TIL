@@ -1,5 +1,25 @@
 ## 一般的な達成方法
 
+### [ARIA17: **関連するフォームコントロールを特定するために、グルーピングロールを使用する**](https://waic.jp/translations/WCAG21/Techniques/aria/ARIA17)
+
+- 概要
+    - フォームに複数のコントロール（入力フィールド、ラジオボタン、チェックボックスなど）があるとき、それらが意味的に関連していればグループ化してわかりやすくできる。
+    - fieldset と legend による達成方法 ([H71](https://waic.jp/translations/WCAG21/Techniques/aria/H71)) を採用すること難しい時に、フォームコントロールをグループ化する代替手段。
+- チェックポイント
+    - 論理的に関連する input や select 要素のグループが role=group をもつ要素内に含まれているこか。
+    - その場合、 aria-label 又は aria-labelledby を使用してアクセシブルな名前がついているか。
+
+### [ARIA20: **ページのリージョンを特定するために region ロールを使用する**](https://waic.jp/translations/WCAG21/Techniques/aria/ARIA20)
+
+- 概要
+    - 汎用的なランドマークを与えて、容易にナビゲートできるようにする。
+    - イメージで言うと、sectionタグで区切るようなものにつける。
+    - もちろんsectionで書けるならsectionの方が良い
+        - sectionタグには自動的にregionロールを持つことを伝える。
+- チェックポイント
+    - ランドマークにしていいほどのものか。
+    - aria-labelやaria-labelledby（推奨）などで名前がついているか。
+
 ### [G140: 異なる提示を可能にするために、情報と構造を表現から分離する](https://waic.jp/translations/WCAG21/Techniques/general/G140)
 
 - 概要
@@ -16,6 +36,14 @@
     - JSで動的にstyleを変更していないか。
         - jsでclass付与を行い、cssでそのclassにスタイルを当てておけば問題なし。
 
+### [H57: HTML 要素の言語属性を使用する](https://waic.jp/translations/WCAG21/Techniques/html/H57)
+
+- 概要
+    - 支援ツールや辞書機能の向上のために、html要素にはもちろん、コンテンツ内の外国語にもlang属性をつけた方が良い
+- チェックポイント
+    - html要素にlang属性があるか。
+    - コンテンツ内の外国語にlang属性がついているか。
+
 ### [F87: **達成基準 1.3.1 の失敗例 － CSS の :before 及び :after 疑似要素並びに 'content' プロパティを用いて、非装飾のコンテンツを挿入している**](https://waic.jp/translations/WCAG-TECHS/F87.html)
 
 - 概要
@@ -28,6 +56,7 @@
 
 - 概要
     - ナビゲーションリンクをnav要素を使ってグループ化する。
+    - 必ずしもnav要素を使用しないといけないわけではない。
     - nav要素が同一ページで複数ある場合は、aria-labelやaria-labelledbyを使用して区別する。
     - 全てのリンクをnavで囲う必要はない
 - チェックポイント
