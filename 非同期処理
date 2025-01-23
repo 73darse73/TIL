@@ -64,3 +64,196 @@ console.log("end");  // D
 14. Cが実行される。
 15. Cがコールスタックから消える。
 16. cbがコールスタックから消える。
+
+↓非同期処理についての流れがわかりやすい
+
+https://www.youtube.com/watch?v=hfoxoVo0cVo
+
+## Promise
+
+```jsx
+console.log("1番目");
+
+// 1秒後に実行する処理
+setTimeout(() => {
+  console.log("2番目(1秒後に実行)");
+}, 1000);
+
+console.log("3番目");
+```
+
+上記の例だと、1番目→3番目→2番目の順に実行されてる。
+
+このような場合に1番目→2番目→3番目の順にしたい時にPromiseが使われる。
+
+```jsx
+console.log("1番目");
+
+// お約束を取り付けたい処理にPromise
+new Promise((resolve) => {
+  //1秒後に実行する処理
+  setTimeout(() => {
+    console.log("2番目(1秒後に実行)");
+    //無事処理が終わったことを伝える
+    resolve();
+  }, 1000);
+}).then(() => {
+  // 処理が無事終わったことを受けとって実行される処理
+  console.log("3番目");
+});
+```
+
+上記だと、1番目→2番目→3番目の順に実行される。
+
+↓Promiseについてわかりやすい
+
+https://qiita.com/cheez921/items/41b744e4e002b966391a
+
+## Promiseについて詳しく
+
+PromiseにはPromiseStatusという3つのstatusがある。
+
+- pending: 未解決 (処理が終わるのを待っている状態)
+- resolved: 解決済み (処理が終わり、無事成功した状態)
+- rejected: 拒否 (処理が失敗に終わってしまった状態)
+
+![image.png](https://prod-files-secure.s3.us-west-2.amazonaws.com/be89dc3c-6442-47ed-869e-31119696b207/8f7e80ee-c8e3-4ca2-9e67-2597d37b6561/image.png)
+
+```jsx
+//resolveした場合
+const promise = new Promise((resolve, reject) => {
+  resolve("test");
+})
+  .then((val) => {
+    console.log(`then1: ${val}`);
+    return val;
+  })
+  .catch((val) => {
+    console.log(`catch: ${val}`);
+    return val;
+  })
+  .then((val) => {
+    console.log(`then2: ${val}`);
+  });
+  
+//結果
+then1: test
+then2: test
+```
+
+```jsx
+//rejectした場合
+const promise = new Promise((resolve, reject) => {
+  resolve("test");
+})
+  .then((val) => {
+    console.log(`then1: ${val}`);
+    return val;
+  })
+  .catch((val) => {
+    console.log(`catch: ${val}`);
+    return val;
+  })
+  .then((val) => {
+    console.log(`then2: ${val}`);
+  });
+
+//結果
+chatch: test
+then2: test
+```
+
+### Promise.all
+
+全部成功したら.thenを行う
+
+どれか一つ失敗したらcatchに移る
+
+```jsx
+const p1 = Promise.resolve("成功！");  
+const p2 = Promise.resolve("成功！");  
+const p3 = Promise.reject("すぐ失敗");
+const p4 = setTimeout(() => Promise.reject("後で失敗"), 3000)
+
+Promise.all([p1, p2, p3, p4])
+.then(values => {
+  console.log(values);
+})
+.catch(error => {
+  console.error(error)
+});
+```
+
+### Promise.**allSettled**
+
+返り値は配列で、それぞれのpromiseの結果を返す。
+成功の場合は成功の場合は{status:"fulfilled",value:結果の値}で、失敗の場合は{status:"rejected",value:結果の値（エラーの内容）}というオブジェクトが返される。
+
+途中で失敗しても最後まで実行される。
+
+```jsx
+const promise1 = Promise.resolve(3);
+const promise2 = new Promise((resolve, reject) => setTimeout(reject, 100, 'foo'));
+
+Promise.allSettled([promise1, promise2]).then((results) => {
+  console.log(results) // [{status: 'fulfilled', value: 3}, {status: 'rejected', reason: 'foo'}]
+}); 
+```
+
+### Promise.race
+
+```jsx
+const promise1 = new Promise((resolve) => {
+  setTimeout(() => {
+    resolve();
+  }, 1000);
+}).then(() => {
+  console.log("promise1おわったよ！");
+});
+
+const promise2 = new Promise((resolve) => {
+  setTimeout(() => {
+    resolve();
+  }, 3000);
+}).then(() => {
+  console.log("promise2おわったよ！");
+});
+
+Promise.race([promise1, promise2]).then(() => {
+  console.log("どれか一つおわったよ！");
+});
+
+//結果
+promise1おわったよ！
+どれか一つおわったよ！
+promise2おわったよ！
+```
+
+## async/await
+
+```jsx
+const alwaysLateBoy = (ms) => {
+  new Promise((resolve) => {
+    setTimeout(() => {
+      resolve();
+    }, ms);
+  }).then(() => {
+    console.log(`すまん！${ms}ms待たせたな。`);
+  });
+};
+```
+
+↓↓↓
+
+```jsx
+// async function を定義
+const alwaysLateBoy = async (ms) => {
+  await new Promise((resolve) => {
+    setTimeout(() => {
+      resolve();
+    }, ms);
+  })
+  // Promiseの結果が返ってくるまで実行されない
+  console.log(`すまん！${ms}ms待たせたな。`)
+};
+```
