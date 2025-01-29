@@ -273,3 +273,41 @@ https://codesandbox.io/p/sandbox/udemy-9wjggj?file=%2Fsrc%2Findex.mjs
         console.log(arr6);　//(2) [100, 20]
         console.log(arr4);　//(2) [10, 20]
         ```
+        
+    - mapやfilter
+        - ES2015で追加された、配列の処理の方法
+        
+        ```jsx
+        const nameArr = ["田中", "山田", "じゃけぇ"];
+        for (let index = 0; index < nameArr.length; index++) {
+        	console.log(nameArr[index]);　//田中　山田　じゃけぇ
+        }
+        
+        nameArr.map((name) => {
+        	console.log(name);　//田中　山田　じゃけぇ
+        });
+        
+        const nameArr2 = nameArr.map((name) => {
+        	return name;
+        });
+        console.log(nameArr2);　//(3) ["田中", "山田", "じゃけぇ"];
+        
+        nameArr.map((name) => console.log(name));　//田中　山田　じゃけぇ
+        
+        nameArr.map((name, index) => console.log(`${index + 1}番目は${name}です`));
+        
+        const newNameArr = nameArr.map((name) => {
+        	if(name === "じゃけぇ"){
+        		return name;
+        	} else {
+        		return `${name}さん`;
+        	}
+        ```
+        
+        ```jsx
+        const numArr = [1, 2, 3, 4, 5];
+        const newNumArr = numArr.filter((num) => {
+        	return num % 2 === 1;
+        });
+        console.log(newNumArr);　//(3) [1, 3, 5]
+        ```
