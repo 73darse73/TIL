@@ -363,3 +363,4 @@ https://codesandbox.io/p/sandbox/udemy-9wjggj?file=%2Fsrc%2Findex.mjs
         const fee2 = num2 && "何か設定されました";
         console.log(fee2);　//null(num2="ABC"の時、何か設定されましたが表示される)
         ```
+あ
