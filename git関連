@@ -1,0 +1,177 @@
+## 間違ったブランチにマージしてプッシュしてしまったとき
+
+---
+
+- リバート
+    - 誤ってマージしたコミットのIDを確認する。
+        
+        ```bash
+        git log
+        ```
+        
+    - `git revert`コマンドを使用して、そのコミットを元に戻す。
+        
+        マージコミットには2つの親がある。
+        
+        - `親1` は `feature-branch` という名前のブランチにあった変更。（マージしに行ったブランチ）
+        - `親2` は `main` ブランチにあった変更。（マージを受け入れたブランチ）
+        
+        -m 1 → 親1の変更を残し、親2の変更を取り消す
+        
+        -m2 → 親2の変更を残して親1の変更を取り消す
+        
+        ```bash
+        git revert -m1 <コミットID>
+        ```
+        
+    - 元に戻した変更を、新しいコミットとしてプッシュ。
+        
+        ```bash
+        git push origin <ブランチ名>
+        ```
+        
+    - 差分が戻っていることを確認する
+
+## 違うブランチにしてしまったコミットを持ってくる
+
+---
+
+- チェリーピック
+    - 正しいブランチに切り替える
+        
+        ```bash
+        git checkout <正しいブランチ>
+        ```
+        
+    - 誤ってコミットした内容をチェリーピック
+        
+        ```bash
+        git cherry-pick <誤ったコミットID>
+        ```
+        
+    - 変更をリモートにプッシュ
+        
+        ```bash
+        git push origin <正しいブランチ>
+        ```
+        
+
+## 間違ったコミットやユーザー名を変更する
+
+---
+
+- リベース
+    - リベースの開始
+    リベースしたいコミットの範囲を選ぶ
+        - 直近のコミットから数える方法 (HEAD~n)
+            
+            ```bash
+            git rebase -i HEAD~5
+            ```
+            
+        - コミットのハッシュを使う方法
+            
+            ```bash
+            git rebase -i abc1234
+            ```
+            
+    - `pick` を `edit` に変更
+    sを押すとinsertモードになって編集できる
+    escを押すとコマンドモードになる
+    :wqで保存、:q!で保存せず終了
+        
+        ```bash
+        pick abc1234 Commitメッセージ1
+        edit def5678 Commitメッセージ2
+        pick ghi9876 Commitメッセージ3
+        ```
+        
+    - コミットを修正
+        
+        下記のコードでは、コミットコメントもメアドも変更ができる
+        
+        ```bash
+        git commit --amend --author="Your Name <your-email@example.com>"
+        ```
+        
+    - リベースを続行
+        
+        ```bash
+        git rebase --continue　//続行
+        git rebase --abote　//中止
+        ```
+        
+    - 繰り返して終わったらプッシュ
+
+## 間違ってコミットしてしまった（プッシュはしてない）
+
+---
+
+- リセット
+    - 作業分を残したい場合
+        
+        ```bash
+         git reset --soft HEAD~1
+        ```
+        
+    - 作業分を破棄する場合（プッシュしてたら絶対気をつける）
+        
+        ```bash
+        git reset --hard HEAD~1
+        ```
+        
+
+## 現在いるブランチを調べる
+
+---
+
+- symbolic-refのコマンド一覧
+    
+    ```bash
+    usage: git symbolic-ref [<options>] <name> [<ref>]
+       or: git symbolic-ref -d [-q] <name>
+    
+        -q, --quiet           suppress error message for non-symbolic (detached) refs
+        -d, --delete          delete symbolic ref
+        --short               shorten ref output
+        -m <reason>           reason of the update
+    ```
+    
+- 実用的なのは以下かも
+    
+    ```bash
+    git symbolic-ref --short HEAD
+    ```
+    
+
+## Aブランチより後に切ったBブランチを先にマージし、
+その内容を前提でAブランチで作業したい時
+
+---
+
+- 例
+    - 状況
+        - masterブランチからAブランチを切り、作業をしている。
+        - その後、masterブランチからBブランチを切り、FV画像を変更。
+        - Bブランチをmasterにマージ。
+        - その後、Aブランチで、FV画像を元に戻したい。
+    - 解決策
+        - Aブランチにmasterをマージする。
+        - 画像が反映されているので、そこに対して作業をして再びmasterにマージする。
+
+## ファイルを特定の時期のものに戻したい時
+
+---
+
+- checkout,restore
+    - 元々checkoutに、複数の役割があったが、専用コマンドができた。
+        - switchとrestore
+    
+    ```bash
+    git checkout <commit> -- <filename>
+    git restore --source <commit> <filename>
+    
+    //例
+    git restore --source abc123 file1.txt file2.txt
+    git restore --source abc123 *.txt
+    ```
