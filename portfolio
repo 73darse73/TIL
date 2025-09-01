@@ -113,6 +113,141 @@
     - デメリット：生埋め込みより初期構築に時間がかかる。
     - メリット：仕様変更が即反映可能、将来GoやPythonでも再利用可。
 
+## ディレクトリ構成
+
+- 1つのコマンドで2つのディレクトリを立ち上げたい
+- フロントエンドとバックエンドは完全に分けたい
+
+```markdown
+root/
+├─ frontend/      # Next.js 14（App Router, TS）
+├─ backend/       # NestJS 10（REST, DTOはサーバ内完結）
+└─ package.json   # 同時起動などのオーケストレーションのみ
+```
+
+## git管理
+
+### 1. 目的・背景
+
+- ソロ開発／小規模開発において**スピード重視**で進めるため、**すべての作業を `main` ブランチ上で行う**。
+- 本番を壊さないために、**デプロイは手動承認**・**最低限の品質ゲート**・**タグ運用**を併用する。
+
+### 2. 対象範囲
+
+- リポジトリ構成：
+    
+    ```
+    bash
+    コピーする編集する
+    root/
+    ├─ frontend/   # Next.js（Vercelへデプロイ）
+    ├─ backend/    # NestJS（Railway/Render等へデプロイ）
+    └─ package.json（オーケストレーション）
+    ```
+    
+- 対象：フロントエンド／バックエンドの開発・デプロイ・リリース管理。
+
+### 3. 基本方針
+
+- **開発はすべて `main` に直接コミット／プッシュ**する。
+- **本番デプロイは自動化しない**（手動昇格／手動デプロイ）。
+- プッシュ前に**ビルド・Lint**をローカルで必ず通す（フックで担保）。
+- リリースのスナップショットとして**Gitタグ（SemVer推奨）**を打つ。
+
+### 4. デプロイ運用（手動リリース）
+
+**4.1 Frontend（Vercel）**
+
+- 設定：Project → Settings → Git
+    - **“Automatically deploy the Production Branch” を OFF**
+    - プッシュ時は **Preview** が自動作成される（確認用）
+- リリース手順：
+    1. `main` にプッシュ
+    2. Vercelの**Preview** を確認
+    3. 問題なければ **Promote to Production** で本番反映
+
+**4.2 Backend（Railway/Render 等）**
+
+- 設定：Auto Deploy を **OFF**（mainプッシュでは本番に出ない）
+- リリース手順：
+    1. `main` にプッシュ
+    2. サービスの**Preview/Build**を確認
+    3. **手動 Deploy** ボタンで本番反映
+- 注意：環境変数・CORS 許可オリジンは本番URLに合わせて管理
+
+### 5. 品質ゲート（ローカル必須）
+
+**root/package.json**
+
+```json
+{
+  "scripts": {
+    "check": "pnpm -C frontend lint && pnpm -C frontend build && pnpm -C backend build"
+  }
+}
+```
+
+**Husky で pre-push フック（任意だが推奨）**
+
+```bash
+pnpm dlx husky-init && pnpm i
+echo 'pnpm run check' > .husky/pre-push
+chmod +x .husky/pre-push
+```
+
+- 目的：**壊れたビルドを main に送らない**。
+- 失敗したらプッシュは中断される。
+
+### 6. バージョニング／リリース管理
+
+- リリース時に Gitタグを付与（例：`v0.1.0`）
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+- 任意で **CHANGELOG.md** を更新（主要変更を箇条書き）
+- **ロールバック**：
+    - Frontend：Vercel の **Revert** または前回の Production デプロイに戻す
+    - Backend：前回の成功デプロイに **Roll Back**（ベンダ機能がない場合はタグをチェックアウトして再デプロイ）
+
+### 7. 例外運用（ブランチを切る条件）
+
+次の場合のみ短命ブランチ＋PRを使う（レビュー／プレビュー用途）：
+
+- 破壊的変更や**大規模差分**になる作業
+- **第三者レビュー**が必要なとき
+- 並行作業が発生し、**作業の独立性**を保ちたいとき
+    
+    ※ ブランチ命名例：`feat/web-hero-fv`・`fix/api-cors-origin`
+    
+
+### 8. 日々の運用フロー（チェックリスト）
+
+1. 変更を加える → `git add -A && git commit -m "feat: ..."`
+2. プッシュ前に `pnpm run check`（Huskyで自動化可）
+3. `git push`（= Vercel/サービス側で **Preview** 生成）
+4. Preview で見た目・動作確認
+5. 問題なければ **Promote to Production / 手動 Deploy**
+6. 必要に応じてタグ付与（`v0.x.y`）
+
+### 9. リスクと対策
+
+| リスク | 兆候 | 対策 |
+| --- | --- | --- |
+| 壊れた状態を本番へ反映 | プッシュ直後に障害 | 本番を**手動昇格**に固定、`check` でビルドエラーを抑止 |
+| 見落とし | PreviewではOKだが本番だけ不具合 | 本番前に**環境変数/CORS**を再確認、簡易スモーク（/health, /projects） |
+| 変更範囲が肥大化 | コミットが大きすぎて差分把握困難 | 作業を**小さく分割**、必要時のみ短命ブランチ |
+
+### 10. 補足（推奨設定）
+
+- **main ブランチ保護**（GitHub → Settings → Branches）：
+    - 「直push可」でも、**Status checks**（任意のCI）を将来有効化すると安心
+- **モノレポ設定**：
+    - Vercel（frontend/**Root Directory** を `frontend/`）
+    - Railway/Render（**Build/Root** を `backend/` に設定）
+
 ## 作業メモ
 
 - 実際のサイトを作る時の一般的な方法でやってみたいので、chatgptに聞いた順番でやってみる
@@ -654,4 +789,1490 @@ pnpm -C backend prisma db push
     - ここでまた色々迷っちゃって先に進まないからやっぱcursorに作ってもらう
 - 次に進むことにした
 - そういえばディレクトリ構成決めてなかった
-    -
+    - 1つのコマンドで2つのディレクトリを立ち上げたい
+    - フロントエンドとバックエンドは完全に分けたい
+    - 上記から以下の構成にする
+    
+    ```markdown
+    root/
+    ├─ frontend/      # Next.js 14（App Router, TS）
+    ├─ backend/       # NestJS 10（REST, DTOはサーバ内完結）
+    └─ package.json   # 同時起動などのオーケストレーションのみ
+    ```
+    
+- git
+    - 管理しづらいかな？って思ったけど、rootでgit initをしてどっちもコミットするようにする。後からfrontとbackのgit履歴分けようと思ったら分けれるみたい
+    - ちゃんとbranchを作るのも考えたけど、スピードを出すためにmainで直接運用する
+- frontendディレクトリにnextをインストール
+    - インストールコマンドに迷った
+        - pnpm i next@latest react@latest react-dom@latest
+            - 既存のバージョンを上げたいならこっち
+        - npx create-next-app@latest
+            - 新規ならこっち
+            - pnpmを使ってるのでpnpm dlx create-next-app@latest create-next-app@latest frontend を使う
+- ルートのpackage.jsonを作る
+    - package.json
+        
+        ```json
+        {
+            "name": "portfolio",
+            "private": true,
+            "version": "0.1.0",
+            "packageManager": "pnpm@9",
+            "engines": { "node": ">=20", "pnpm": ">=9" },
+            "scripts": {
+                "dev": "concurrently -k -n FE,BE -c auto \"pnpm -C frontend dev\" \"pnpm -C backend start:dev\"",
+            
+                "build": "pnpm -C frontend build && pnpm -C backend build",
+                "start": "pnpm -C backend start:prod",
+            
+                "lint": "pnpm -C frontend lint && pnpm -C backend lint",
+                "typecheck": "pnpm -C frontend typecheck && pnpm -C backend typecheck",
+                "format": "pnpm -C frontend format && pnpm -C backend format",
+                "check": "pnpm run lint && pnpm run build",
+            
+                "install:all": "pnpm install && pnpm -C frontend install && pnpm -C backend install",
+                "prepare": "husky"
+            },
+            "devDependencies": {
+                "concurrently": "^8.0.0",
+                "husky": "^9.0.0"
+            }
+        }
+        
+        ```
+        
+    - "packageManager": "pnpm@9",
+        - **使用するパッケージマネージャーとバージョンを明示**
+        - このプロジェクトでは pnpm の 9.x 系を使うことを宣言
+        - なくても動くがチーム開発・CI/CDで重要
+    - "engines": { "node": ">=20", "pnpm": ">=9" },
+        - **必要な環境の最低要件を明示**
+            - node: Node.js 20以上が必要
+            - pnpm: pnpm 9以上が必要
+        - なくても動くが環境の統一で重要
+    - "dev": "concurrently -k -n FE,BE -c auto \"pnpm -C frontend dev\" \"pnpm -C backend start:dev\"",
+        - concurrently
+            - **複数のコマンドを同時に実行**できるnpmパッケージ
+            - 通常、ターミナルを分けて実行する必要があるものを1つのターミナルで並行実行
+            - 片方が終了しても、もう片方は動き続ける
+        - -k
+            - "kill others" の略
+            - **片方のプロセスが終了したら、もう片方も自動で終了**
+        - -n FE,BE
+            - -n: "names" の略
+            - ログの表示に名前を付ける
+            - フロントエンドのログには [FE]、バックエンドのログには [BE] が表示される
+        - **-c auto**
+            - **-c**: "colors" の略
+            - **ログに色を付ける**
+            - フロントエンドとバックエンドで異なる色で表示される
+    - -C
+        - **特定のディレクトリでコマンドを実行**するpnpmのオプション
+        - "Change directory" の略
+    - "prepare": "husky”
+        - **npm/pnpm install 実行時に自動で実行される**スクリプト
+        - パッケージのインストール完了後に自動実行
+        - 設定ファイルの生成や初期化に使用
+- pnpm-workspace.yamlの作成
+    - pnpmでモノレポ（複数のパッケージを1つのリポジトリで管理する構成）を使うときに必要になる設定ファイル
+        - **依存を共有できる**
+            - ルートで `pnpm install` すると、ワークスペース内のすべてのプロジェクトの依存をまとめて解決してくれる
+            - 依存の重複も自動的に最適化される
+        - **ローカルパッケージをリンクできる**
+            - あるプロジェクトが別プロジェクトを依存として使いたいとき、npm公開しなくてもローカルで直結できる
+        - **スクリプトをまとめて実行できる**
+            - `pnpm -r run build` で、すべてのパッケージの `build` スクリプトを順に実行できる
+    - 今回は以下が魅力的なのでこのファイルを作成する
+        - 2つのプロジェクトの依存関係をpnpm installでインストールできる
+        - 今後シェアしたいコードが出てくるかもしれない（拡張性）
+- next.jsプロジェクトが入っているから、FEのたりないパッケージを入れていく
+    - shadcn/ui
+        - セットアップ：pnpm dlx shadcn@latest init
+            - Which color would you like to use as the base color?
+                - https://ui.shadcn.com/colors
+                - 雰囲気でzincを選んだ
+            - インストール完了
+            - 以下のファイルが生成された
+                - frontend直下
+                    - lib/utils.ts
+                    - conponents.jsonファイル
+                - ルート直下 なぜ？
+                    - node_modules なぜ？
+                    - pnpm-lock.yaml なぜ？
+            - 以下のファイルが変更された
+                - frontend/app/globals.css
+                    - **Tailwind CSSの設定更新**
+                - frontend/package.json
+                    - **shadcn/uiの依存関係追加**
+            - どうやら、以下の流れだったみたい
+                
+                ```
+                shadcn/uiがフロントエンドの依存関係をインストール
+                 ↓
+                pnpmがpnpm-workspace.yamlを検出
+                 ↓
+                「ルートレベルでも依存関係管理が必要」と判断
+                 ↓
+                ルートのpackage.jsonの依存関係も自動インストール
+                ```
+                
+            - ルートにできたnode_modulesがgit管理されてるので、.gitignoreで除外する
+                - node_modulesを以下でトラックから除外
+                
+                ```markdown
+                git rm -r --cached node_modules
+                ```
+                
+                - node_modulesのみを記述した.gitignoreを作成
+- 次どうしよう、、
+- TOPページを作って行こう
+    - fv
+        - 以下でボタンをインストールしてfv作ってもらった
+            - pnpm dlx shadcn@latest add button
+- localhost:3000;がnextの初期画面から変わらない
+    
+    ```markdown
+    kodama@kodama-MacBook-Pro-fukuoka-pencil portfolio % cd .. && pnpm dev
+    
+    > youtube-loop_next@0.1.0 dev /Users/kodama/github
+    > next dev
+    
+      ▲ Next.js 14.2.26
+      - Local:        http://localhost:3000
+    ```
+    
+    - 一連の流れ
+        
+        **1. 問題の発生状況**
+        
+        **エラーメッセージtext> youtube-loop_next@0.1.0 dev /Users/kodama/github**
+        
+        ### **なぜ起きたか**
+        
+        - **以前のプロジェクト**: youtube-loop_nextでpnpmを使用
+        - **古いキャッシュ**: そのプロジェクトの依存関係情報が残ってた
+        - **新しいプロジェクト**: portfolioで古いキャッシュが読み込まれた
+        
+        **2. キャッシュの具体的な内容**
+        
+        ### **残ってた情報**
+        
+        - **プロジェクト名**: youtube-loop_next
+        - **依存関係**: 古いバージョンのパッケージ情報
+        - **ロックファイル情報**: 以前のインストール状況
+        - **メタデータ**: 古いプロジェクトの設定
+        
+        ### **問題の影響**
+        
+        - **パッケージ解決の混乱**: どのパッケージを使うべきか分からない
+        - **依存関係の混在**: 異なるプロジェクトの依存関係が混在
+        - **インストールエラー**: Next.jsパッケージが見つからない
+        
+        **3. 問題の連鎖**
+        
+        **1段階目: 古いキャッシュの読み込みbash# pnpmが古いキャッシュを読み込む# youtube-loop_nextの情報がportfolioプロジェクトに適用される**
+        
+        **2段階目: 依存関係の混乱bash# 古い依存関係情報でパッケージ解決を試行# 結果：Next.jsパッケージが見つからない**
+        
+        **3段階目: エラーの発生bash# Turbopackエラー# 開発サーバーの起動失敗**
+        
+        **4. 解決の流れ**
+        
+        **キャッシュのクリアbashpnpm store prune# 古いキャッシュを削除# 未使用のパッケージをクリア**
+        
+        **依存関係の再構築bashpnpm install# キャッシュから正しい依存関係を再構築# プロジェクト固有の設定を適用**
+        
+        **5. 根本原因**
+        
+        ### **技術的な原因**
+        
+        - **pnpmのキャッシュ管理**: 古い情報が蓄積
+        - **プロジェクトの切り替え**: 異なるプロジェクト間での情報混在
+        - **依存関係の複雑性**: モノレポ構成での管理の難しさ
+        
+        ### **運用上の原因**
+        
+        - **キャッシュの定期的なクリア**: 行われてなかった
+        - **プロジェクト間の分離**: 不完全な分離
+        - **依存関係の管理**: 統一されていない管理方法
+        
+        **6. 学んだ教訓**
+        
+        ### **キャッシュ管理の重要性**
+        
+        - **定期的なクリア**: 古い情報の蓄積を防ぐ
+        - **プロジェクト間の分離**: 異なるプロジェクトの情報を混在させない
+        - **依存関係の統一**: 一つのパッケージマネージャーで統一
+        
+        ### **問題解決のアプローチ**
+        
+        - **症状の特定**: エラーメッセージから問題を特定
+        - **根本原因の追求**: 表面的な問題ではなく根本原因を解決
+        - **段階的な解決**: 一歩ずつ問題を解決
+        
+        ## **まとめると**
+        
+        **今回のキャッシュ問題**
+        
+        :
+        
+        1. **古いプロジェクト情報**がキャッシュに残ってた
+        2. **依存関係の混在**でパッケージ解決が混乱
+        3. **キャッシュのクリア**で問題を解決
+        4. **定期的なキャッシュ管理**の重要性を学んだ
+- FV作成中
+    - chatgptに作ってもらい、hero.tsxではuse clientを使っている
+    - 以下を追加
+        - @react-three/fiber (9.3.0)
+        - ✅ @react-three/drei (10.7.3)
+        - ✅ three (0.179.1)
+        - ✅ @types/three (0.179.0) - devDependencies
+    - three.jsやインタラクションアニメーションを使おうとしたけど迷ったので結局一旦画像を静的に置いてる
+    - 前の状態から何を追加したかわからなくなるから、ブランチ切って対応しよう、、
+- gitルール
+    - 以下をおすすめされた
+        - 短命ブランチ
+            - feat/analytics-radar-chart
+    - けど、ブランチを見ただけで作業内容が分かりづらいから、以下で運用してみる
+        - `feat/<ページ名>_<セクション名>_<何をする>`
+            - feat/top_fv_add-motion
+    - 以下が詳細ルール
+        
+        # 1) コミット規約
+        
+        **よくある選択肢**
+        
+        - なし（自由記述）
+        - Conventional Commits（`feat/fix/chore` + スコープ）
+        - Gitmoji（絵文字接頭辞）
+            
+            **推奨**：**Conventional Commits**
+            
+            **ひとこと**：検索・自動生成（CHANGELOG）・履歴把握に最強。絵文字は補助に。
+            
+        
+        ---
+        
+        # 2) マージ方式
+        
+        **よくある選択肢**
+        
+        - Merge commit（通常マージ）
+        - Squash merge（PRを1コミットに潰す）
+        - Rebase & merge（履歴直線化）
+            
+            **推奨**：**Squash merge**
+            
+            **ひとこと**：PR＝1コミットで履歴が読みやすい。後でバグ追跡が楽。
+            
+        
+        ---
+        
+        # 3) PR テンプレ
+        
+        **よくある選択肢**
+        
+        - なし
+        - 軽量テンプレ（目的/変更点/確認手順）
+        - 重めテンプレ（影響範囲/リリース注意/スクショ必須）
+            
+            **推奨**：**軽量＋スクショ必須**
+            
+            **ひとこと**：最小限で回す。UIはスクショ動画リンクが最強のドキュメント。
+            
+        
+        ---
+        
+        # 4) Branch Protection
+        
+        **よくある選択肢**
+        
+        - 無し（直push許可）
+        - PR必須のみ
+        - PR必須 + Status Checks 必須（CI通過必須）
+            
+            **推奨**：**PR必須 + CI通過必須**
+            
+            **ひとこと**：最低限の“事故防止柵”。ソロでも効果大。
+            
+        
+        ---
+        
+        # 5) CI（最小チェック）
+        
+        **よくある選択肢**
+        
+        - なし
+        - Lintのみ
+        - Lint + Build（型はローカル）
+        - Lint + Build + Typecheck
+            
+            **推奨**：**Lint + Build（mainでTypecheck）**
+            
+            **ひとこと**：まず“壊れたビルドを通さない”。型は段階的に強化でもOK。
+            
+        
+        ---
+        
+        # 6) Husky（pre-push）
+        
+        **よくある選択肢**
+        
+        - なし
+        - pre-commit（lint-staged）
+        - pre-push（`pnpm run check`）
+            
+            **推奨**：**pre-pushで `check` を実行**
+            
+            **ひとこと**：CI落ち→修正→再実行の無駄をローカルで潰す。
+            
+        
+        ---
+        
+        # 7) ENV / Secrets 管理
+        
+        **よくある選択肢**
+        
+        - `.env` を直コミット（NG）
+        - `.env` を手配布（Slack/Notion…）
+        - プラットフォームの秘密管理（Vercel/Render/Railway）
+        - 外部Vault（1Password/HashiCorp Vault）
+            
+            **推奨**：**プラットフォームのSecrets + `env.example`**
+            
+            **ひとこと**：`.env`は**絶対にGitに入れない**。`env.example`でキー名だけ共有。
+            
+        
+        ---
+        
+        # 8) DBマイグレーション（Prisma）
+        
+        **よくある選択肢**
+        
+        - `prisma db push`（スキーマ強制反映）
+        - `prisma migrate dev`（開発）
+        - `prisma migrate deploy`（本番）
+            
+            **推奨**：**dev= `migrate dev` / prod= `migrate deploy`**
+            
+            **ひとこと**：履歴型マイグレーションが安全。破壊的変更は必ずバックアップ。
+            
+        
+        ---
+        
+        # 9) タグ & リリース
+        
+        **よくある選択肢**
+        
+        - タグなし運用
+        - 手動タグ（`vX.Y.Z`）
+        - 変更セット管理（changesets / release-please）
+            
+            **推奨**：**本番昇格時に手動タグ（SemVer）**
+            
+            **ひとこと**：タグ＝復元ポイント。ロールバックの心の支え。
+            
+        
+        ---
+        
+        # 10) ホットフィックス
+        
+        **よくある選択肢**
+        
+        - main直コミット
+        - `hotfix/*` ブランチ → 即マージ
+        - フィーチャーフラグで一時OFF
+            
+            **推奨**：**`hotfix/*` を最小差分で即マージ + 手動デプロイ**
+            
+            **ひとこと**：履歴を残しつつ最速で直す。あとで恒久対策PRを分ける。
+            
+    - fvは静的にシンプルにするで決定したので、使ってないパッケージの削除を行った
+        - package.jsonの更新
+            - 要らないモジュール削除
+        - global.cssの削除
+            - tailwindのアニメーションようインポート削除
+        - components.json
+            - components.jsonは**shadcn/ui**というUIコンポーネントライブラリの設定ファイル
+- ここまでで思ったこと
+    - 反省
+        - このパッケージはいつ入れた？なんのために入れた？
+        - これは今使ってるのか使ってないのか？
+    - どうすればいいのか？
+        - ブランチ切って対応する
+            - 要らないパッケージや記述で汚さないようにする
+        - 細かくメッセージ付きでコミットする
+            - パッケージインストールしたらコミット
+            - コード書いたらコミット
+- 一旦プロジェクトを綺麗にしよう、、
+    - 要らないモジュール削除
+    - 要らないコード削除
+- 正直プロジェクト作り直したいけどそれはやめとく
+    - 一旦next.jsの最低限インストールしたとこまでリバートしてクリーンにする
+    - そこからブランチを切って対応していく
+    - リバートしたけど開発環境立ち上がらないしなんかおかしい、、
+    - やっぱ作り直そう、、
+
+- 新しくリポジトリとディレクトリを作成し直した
+- README.md作り直し
+    - 今回
+        
+        ```markdown
+        ## 📄 要件定義（初期版）
+        
+        ### 1. 目的
+        
+        - 転職活動での自己アピール
+        - 副業案件の獲得
+        - 自分の活動や考えを知ってもらう
+        - アウトプット習慣の定着
+        - 勉強の記録
+        - モチベーション維持
+        
+        ---
+        
+        ### 2. 想定ユーザー
+        
+        - 採用担当者
+        - 発注担当者
+        - イベントや勉強会で知り合ったエンジニア
+        - 同じ職場の人
+        
+        ---
+        
+        ### 3. ユースケース（仮）
+        
+        - 採用担当が短時間でスキル・実績を確認
+        - 発注担当が案件依頼の判断材料に使う
+        - エンジニア仲間が活動内容をフォロー
+        - 自分が活動履歴や成長を確認
+        
+        ---
+        
+        ### 4. ページ構成・内容
+        
+        ### Home
+        
+        - ファーストビュー（名前・肩書き）
+        - 簡単な自己紹介
+        - 代表プロジェクト
+        - 簡単な技術力紹介（ランキングなど）
+        - お問い合わせフォーム
+        - 最近の活動一覧
+        
+        ### About
+        
+        - 詳細な自己紹介
+        - 経歴
+        - 興味・関心
+        - 自己PR
+        - スキルマップ全体図
+        
+        ### Projects
+        
+        - 案件・個人PJのケーススタディ（課題→解決→技術→成果）
+        - 投稿記事一覧
+        
+        ### Analytics
+        
+        - リポジトリ数、コミット数、スター数、フォロワー数
+        - 技術スタックランキング
+        - 月次推移グラフ
+        - スコア算出ルール
+        - GitHubの草グラフ
+        
+        ### Contact
+        
+        - フォーム（名前 / メール / 用件 / 本文）
+        
+        ## **使用技術まとめ**
+        
+        ### **フロントエンド**
+        
+        | 技術 | 採用理由 | 補足・代替案 |
+        | --- | --- | --- |
+        | **Next.js 14（App Router, TS）** | Next.jsを実務レベルで学びたい。ISR・画像最適化・Vercelとの親和性が高い。 | Nuxtでも可能だが、今回はReact資産を活かす方針。 |
+        | **Tailwind CSS** | 軽量でclass名設計不要。実装スピードが早い。 | CSS Modules / Vanilla Extract など。 |
+        | **shadcn/ui** | UI構築を短縮し、デザインに強くない部分を補完。 | MUI / Radix UIなども可。 |
+        | **Recharts（レーダー・棒・折れ線）** | JSXとの相性◎。必要十分な機能で軽量。 | Chart.jsは柔軟だがコード量が増えがち。 |
+        | **React Hook Form + Zod** | 軽量で高速、型安全なバリデーション。 | Formikは機能が厚くオーバーキル。 |
+        | **SWR + サーバ側fetch** | キャッシュ＋再検証が簡単。Nest APIとの相性◎。 | React Queryも可。 |
+        | **スパム対策（Honeypot＋軽Rate Limit）** | 公開フォームは高確率でスパムが来る。まずは低コスト対策から。 | CAPTCHAはUX低下するのでフェーズ2で。 |
+        
+        ---
+        
+        ### **バックエンド**
+        
+        | 技術 | 採用理由 | 補足・代替案 |
+        | --- | --- | --- |
+        | **NestJS 10（REST）** | バックエンド設計を体系的に学ぶ。まずはRESTの基礎から。 | 必要に応じてGraphQLへ移行可。 |
+        | **PostgreSQL（Neon）** | AuthやStorage不要なので軽量なマネージドDBで十分。 | Supabaseは認証やStorage込み。 |
+        | **Prisma + 必要時のみ生SQL** | 型安全・スキーマ追従・可読性の高さ。生SQLは性能や特殊処理用。 | Drizzle ORMなども可。 |
+        | **取り込み（RSS Pull + GitHub Webhook）** | 記事は確実に取得、GitHubはリアルタイム化。 | 全ポーリングはレート制限や遅延あり。 |
+        | **ジョブ（Vercel Cron → Nest `/recalc`）** | 日次スコア確定で表示を軽量化。 | 重くなればBullMQ+Redisに移行。 |
+        | **送信（Resend + Slack Webhook）** | 問い合わせの見落とし防止と二重化。 | SMTP直送は管理負担あり。 |
+        
+        ---
+        
+        ### **インフラ / 運用**
+        
+        | 技術 | 採用理由 | 補足・代替案 |
+        | --- | --- | --- |
+        | **Front=Vercel / Back=Railway / DB=Neon** | NextはVercelが最短、Nestは常駐サーバ必須。 | Render / Fly.ioでも可。 |
+        | **監視：Vercel Analytics + Sentry** | 障害検知と可視化で信頼感UP。 | LogtailやAxiomでも可。 |
+        | **pnpm + Node 20 LTS** | 高速・安定・互換性広い。 | npm/Yarnでも動くがpnpm優勢。 |
+        
+        ---
+        
+        ### **スコアリング設計**
+        
+        - **ルールJSON + 計算ライブラリ**
+            - 配点・時系列減衰（半減期）をJSONで管理。
+            - 計算ロジックは バックエンドに実装（Nest）
+            - フロントは スナップショットを取得して表示（Recharts）
+            - メリット：仕様変更が即反映可能、将来GoやPythonでも再利用可。
+            - デメリット：生埋め込みより初期構築に時間がかかる。
+        
+        ## ディレクトリ構成
+        - 1つのコマンドで2つのディレクトリを立ち上げたい
+        - フロントエンドとバックエンドは完全に分けたい
+        ```markdown
+        root/
+        ├─ frontend/      # Next.js 14（App Router, TS）
+        ├─ backend/       # NestJS 10（REST, DTOはサーバ内完結）
+        └─ package.json   # 同時起動などのオーケストレーションのみ
+        ```
+        
+        ## git管理
+        
+        ### 1. 目的・背景
+        
+        - ソロ開発／小規模開発において**スピード重視**で進めるため、**すべての作業を `main` ブランチ上で行う**。
+        - 本番を壊さないために、**デプロイは手動承認**・**最低限の品質ゲート**・**タグ運用**を併用する。
+        
+        ### 2. 対象範囲
+        
+        - リポジトリ構成：
+            
+            ```bash
+            root/
+            ├─ frontend/   # Next.js（Vercelへデプロイ）
+            ├─ backend/    # NestJS（Railway/Render等へデプロイ）
+            └─ package.json（オーケストレーション）
+            ```
+            
+        - 対象：フロントエンド／バックエンドの開発・デプロイ・リリース管理。
+        
+        ## 🔧 Git管理
+        
+        ### 1. ブランチ運用
+        
+        | ブランチ | 用途 | 説明 |
+        |---------|------|------|
+        | `main` | 本番リリース | 常にリリース可能状態を維持 |
+        | `feat/<page>_<section>_<action>` | 機能追加 | 例: `feat/home_fv_add-motion` |
+        | `fix/<scope>_<action>` | バグ修正 | 例: `fix/frontend_form-validation` |
+        | `chore/<scope>_<action>` | 設定・依存更新 | 例: `chore/deps_update-packages` |
+        | `hotfix/<scope>_<action>` | 緊急修正 | 例: `hotfix/backend_critical-bug` |
+        
+        ### 2. コミットメッセージ
+        
+        **Conventional Commits** 準拠
+        
+        ```bash
+        # 形式
+        <type>(<scope>): <description>
+        
+        # 例
+        feat(frontend/home): add hero motion
+        fix(backend/auth): resolve token validation issue
+        chore(deps): update Next.js to 14.1.0
+        ```
+        
+        ### 3. マージ方式
+        
+        - **Squash & Merge** を原則とする
+        - 履歴を整理してからmainブランチに統合
+        
+        ### 4. PRルール
+        
+        #### 必須項目
+        - [ ] PRテンプレートの記入
+          - 目的
+          - 変更点
+          - 確認手順
+          - 影響範囲
+          - リリース注意点
+        
+        #### UI変更時の追加要件
+        - [ ] スクリーンショット or 動画の添付
+        - [ ] レスポンシブ対応の確認
+        
+        #### 基本方針
+        - 小さなPRを高頻度でマージ
+        - 1つのPRで1つの機能・修正に集中
+        
+        ### 5. CI / Lint / Build
+        
+        #### 実行コマンド
+        ```bash
+        # フロントエンド
+        pnpm -C frontend lint
+        pnpm -C frontend build
+        
+        # バックエンド
+        pnpm -C backend build
+        
+        # 型チェック（mainブランチのみ）
+        pnpm run typecheck
+        ```
+        
+        #### 品質担保
+        - **Husky pre-push** で `pnpm run check` を強制実行
+        - mainブランチでは `typecheck` も実行
+        
+        ### 6. ENV / Secrets管理
+        
+        #### 環境変数
+        - `.env` ファイルは **Git禁止**
+        - `env.example` を更新（キー名のみ、値は空）
+        
+        #### シークレット管理
+        - **Vercel** / **Railway** で管理
+        - `preview` / `production` 環境を分離
+        
+        ### 7. DBマイグレーション
+        
+        | 環境 | コマンド | 注意事項 |
+        |------|----------|----------|
+        | 開発 | `prisma migrate dev` | ローカルDBに適用 |
+        | 本番 | `prisma migrate deploy` | 本番DBに適用 |
+        | 破壊的変更時 | - | **バックアップ必須** |
+        
+        ### 8. リリース管理
+        
+        #### タグ運用
+        - 本番昇格時のみタグ付与（`vX.Y.Z`）
+        - セマンティックバージョニング準拠
+        
+        #### ロールバック
+        - タグチェックアウト → 再デプロイ
+        - 緊急時は即座に対応可能
+        
+        ### 9. ホットフィックス
+        
+        #### 緊急修正フロー
+        1. `hotfix/*` ブランチ作成
+        2. 最小差分で修正
+        3. Squash & Merge
+        4. 手動デプロイ
+        5. タグ `vX.Y.(Z+1)` 付与
+        
+        ### 10. 推奨設定
+        
+        #### GitHub設定
+        - **Branch protection** → PR必須 + CI必須
+        - レビュー承認後のマージ許可
+        
+        #### 開発環境
+        - **Prettier + ESLint** でコード整形 & 品質担保
+        - **commitlint + Husky** でコミットチェック
+        - **Renovate**（月1回の依存関係更新）
+        
+        ---
+        
+        ## 📋 運用フロー（チェックリスト）
+        
+        ### 通常開発フロー
+        ```bash
+        # 1. ブランチ作成
+        git switch -c feat/home_fv_add-motion
+        
+        # 2. 実装・テスト
+        # ... 実装作業 ...
+        
+        # 3. 品質チェック
+        pnpm run check
+        
+        # 4. PR作成
+        # - スクリーンショット添付
+        # - テンプレート記入
+        
+        # 5. CI通過確認
+        # - Lint・Build・TypeCheck
+        
+        # 6. Preview確認
+        # - OKなら Squash & Merge
+        
+        # 7. 本番昇格
+        # - 手動デプロイ
+        # - 必要に応じてタグ付与
+        ```
+        
+        ### 緊急修正フロー
+        ```bash
+        # 1. ホットフィックスブランチ
+        git switch -c hotfix/critical-issue
+        
+        # 2. 最小修正
+        # 3. 即座にマージ・デプロイ
+        # 4. タグ付与
+        ```
+        ```
+        
+    - 前回
+        
+        ```markdown
+        ## 📄 要件定義（初期版）
+        
+        ### 1. 目的
+        
+        - 転職活動での自己アピール
+        - 副業案件の獲得
+        - 自分の活動や考えを知ってもらう
+        - アウトプット習慣の定着
+        - 勉強の記録
+        - モチベーション維持
+        
+        ---
+        
+        ### 2. 想定ユーザー
+        
+        - 採用担当者
+        - 発注担当者
+        - イベントや勉強会で知り合ったエンジニア
+        - 同じ職場の人
+        
+        ---
+        
+        ### 3. ユースケース（仮）
+        
+        - 採用担当が短時間でスキル・実績を確認
+        - 発注担当が案件依頼の判断材料に使う
+        - エンジニア仲間が活動内容をフォロー
+        - 自分が活動履歴や成長を確認
+        
+        ---
+        
+        ### 4. ページ構成・内容
+        
+        ### Home
+        
+        - ファーストビュー（名前・肩書き）
+        - 簡単な自己紹介
+        - 代表プロジェクト
+        - 簡単な技術力紹介（ランキングなど）
+        - お問い合わせフォーム
+        - （提案）最近の活動一覧
+        
+        ### About
+        
+        - 詳細な自己紹介
+        - 経歴
+        - 興味・関心
+        - 自己PR
+        - （提案）スキルマップ全体図
+        
+        ### Projects
+        
+        - 案件・個人PJのケーススタディ（課題→解決→技術→成果）
+        - 投稿記事一覧
+        - （提案）GitHub連携でコードサンプルリンク
+        
+        ### Analytics
+        
+        - リポジトリ数、コミット数、スター数、フォロワー数
+        - 技術スタックランキング
+        - 月次推移グラフ
+        - スコア算出ルール
+        - GitHubの草グラフ
+        
+        ### Contact
+        
+        - フォーム（名前 / メール / 用件 / 本文）
+        
+        ## **使用技術まとめ**
+        
+        ### **フロントエンド**
+        
+        | 技術 | 採用理由 | 補足・代替案 |
+        | --- | --- | --- |
+        | **Next.js 14（App Router, TS）** | Next.jsを実務レベルで学びたい。ISR・画像最適化・Vercelとの親和性が高い。 | Nuxtでも可能だが、今回はReact資産を活かす方針。 |
+        | **Tailwind CSS** | 軽量でclass名設計不要。実装スピードが早い。 | CSS Modules / Vanilla Extract など。 |
+        | **shadcn/ui** | UI構築を短縮し、デザインに強くない部分を補完。 | MUI / Radix UIなども可。 |
+        | **Recharts（レーダー・棒・折れ線）** | JSXとの相性◎。必要十分な機能で軽量。 | Chart.jsは柔軟だがコード量が増えがち。 |
+        | **React Hook Form + Zod** | 軽量で高速、型安全なバリデーション。 | Formikは機能が厚くオーバーキル。 |
+        | **SWR + サーバ側fetch** | キャッシュ＋再検証が簡単。Nest APIとの相性◎。 | React Queryも可。 |
+        | **スパム対策（Honeypot＋軽Rate Limit）** | 公開フォームは高確率でスパムが来る。まずは低コスト対策から。 | CAPTCHAはUX低下するのでフェーズ2で。 |
+        
+        ---
+        
+        ### **バックエンド**
+        
+        | 技術 | 採用理由 | 補足・代替案 |
+        | --- | --- | --- |
+        | **NestJS 10（REST）** | バックエンド設計を体系的に学ぶ。まずはRESTの基礎から。 | 必要に応じてGraphQLへ移行可。 |
+        | **PostgreSQL（Neon）** | AuthやStorage不要なので軽量なマネージドDBで十分。 | Supabaseは認証やStorage込み。 |
+        | **Prisma + 必要時のみ生SQL** | 型安全・スキーマ追従・可読性の高さ。生SQLは性能や特殊処理用。 | Drizzle ORMなども可。 |
+        | **取り込み（RSS Pull + GitHub Webhook）** | 記事は確実に取得、GitHubはリアルタイム化。 | 全ポーリングはレート制限や遅延あり。 |
+        | **ジョブ（Vercel Cron → Nest `/recalc`）** | 日次スコア確定で表示を軽量化。 | 重くなればBullMQ+Redisに移行。 |
+        | **送信（Resend + Slack Webhook）** | 問い合わせの見落とし防止と二重化。 | SMTP直送は管理負担あり。 |
+        
+        ---
+        
+        ### **インフラ / 運用**
+        
+        | 技術 | 採用理由 | 補足・代替案 |
+        | --- | --- | --- |
+        | **Front=Vercel / Back=Railway / DB=Neon** | NextはVercelが最短、Nestは常駐サーバ必須。 | Render / Fly.ioでも可。 |
+        | **監視：Vercel Analytics + Sentry** | 障害検知と可視化で信頼感UP。 | LogtailやAxiomでも可。 |
+        | **pnpm + Node 20 LTS** | 高速・安定・互換性広い。 | npm/Yarnでも動くがpnpm優勢。 |
+        
+        ---
+        
+        ### **スコアリング設計**
+        
+        - **ルールJSON + 計算ライブラリ**
+            - 配点・時系列減衰（半減期）をJSONで管理。
+            - 計算ロジックは バックエンドに実装（Nest）
+            - フロントは スナップショットを取得して表示（Recharts）
+            - メリット：仕様変更が即反映可能、将来GoやPythonでも再利用可。
+            - デメリット：生埋め込みより初期構築に時間がかかる。
+        
+        ## ディレクトリ構成
+        - 1つのコマンドで2つのディレクトリを立ち上げたい
+        - フロントエンドとバックエンドは完全に分けたい
+        ```markdown
+        root/
+        ├─ frontend/      # Next.js 14（App Router, TS）
+        ├─ backend/       # NestJS 10（REST, DTOはサーバ内完結）
+        └─ package.json   # 同時起動などのオーケストレーションのみ
+        ```
+        
+        ## git管理
+        
+        ### 1. 目的・背景
+        
+        - ソロ開発／小規模開発において**スピード重視**で進めるため、**すべての作業を `main` ブランチ上で行う**。
+        - 本番を壊さないために、**デプロイは手動承認**・**最低限の品質ゲート**・**タグ運用**を併用する。
+        
+        ### 2. 対象範囲
+        
+        - リポジトリ構成：
+            
+            ```bash
+            コピーする編集する
+            root/
+            ├─ frontend/   # Next.js（Vercelへデプロイ）
+            ├─ backend/    # NestJS（Railway/Render等へデプロイ）
+            └─ package.json（オーケストレーション）
+            ```
+            
+        - 対象：フロントエンド／バックエンドの開発・デプロイ・リリース管理。
+        
+        ### 3. 基本方針
+        
+        - **開発はすべて `main` に直接コミット／プッシュ**する。
+        - **本番デプロイは自動化しない**（手動昇格／手動デプロイ）。
+        - プッシュ前に**ビルド・Lint**をローカルで必ず通す（フックで担保）。
+        - リリースのスナップショットとして**Gitタグ（SemVer推奨）**を打つ。
+        
+        ### 4. デプロイ運用（手動リリース）
+        
+        **4.1 Frontend（Vercel）**
+        
+        - 設定：Project → Settings → Git
+            - **“Automatically deploy the Production Branch” を OFF**
+            - プッシュ時は **Preview** が自動作成される（確認用）
+        - リリース手順：
+            1. `main` にプッシュ
+            2. Vercelの**Preview** を確認
+            3. 問題なければ **Promote to Production** で本番反映
+        
+        **4.2 Backend（Railway/Render 等）**
+        
+        - 設定：Auto Deploy を **OFF**（mainプッシュでは本番に出ない）
+        - リリース手順：
+            1. `main` にプッシュ
+            2. サービスの**Preview/Build**を確認
+            3. **手動 Deploy** ボタンで本番反映
+        - 注意：環境変数・CORS 許可オリジンは本番URLに合わせて管理
+        
+        ### 5. 品質ゲート（ローカル必須）
+        
+        **root/package.json**
+        
+        ```json
+        jsonc
+        コピーする編集する
+        {
+          "scripts": {
+            "check": "pnpm -C frontend lint && pnpm -C frontend build && pnpm -C backend build"
+          }
+        }
+        
+        ```
+        
+        **Husky で pre-push フック（任意だが推奨）**
+        
+        ```bash
+        bash
+        コピーする編集する
+        pnpm dlx husky-init && pnpm i
+        echo 'pnpm run check' > .husky/pre-push
+        chmod +x .husky/pre-push
+        
+        ```
+        
+        - 目的：**壊れたビルドを main に送らない**。
+        - 失敗したらプッシュは中断される。
+        
+        ### 6. バージョニング／リリース管理
+        
+        - リリース時に Gitタグを付与（例：`v0.1.0`）
+        
+        ```bash
+        bash
+        コピーする編集する
+        git tag v0.1.0
+        git push origin v0.1.0
+        
+        ```
+        
+        - 任意で **CHANGELOG.md** を更新（主要変更を箇条書き）
+        - **ロールバック**：
+            - Frontend：Vercel の **Revert** または前回の Production デプロイに戻す
+            - Backend：前回の成功デプロイに **Roll Back**（ベンダ機能がない場合はタグをチェックアウトして再デプロイ）
+        
+        ### 7. 例外運用（ブランチを切る条件）
+        
+        次の場合のみ短命ブランチ＋PRを使う（レビュー／プレビュー用途）：
+        
+        - 破壊的変更や**大規模差分**になる作業
+        - **第三者レビュー**が必要なとき
+        - 並行作業が発生し、**作業の独立性**を保ちたいとき
+            
+            ※ ブランチ命名例：`feat/web-hero-fv`・`fix/api-cors-origin`
+            
+        
+        ### 8. 日々の運用フロー（チェックリスト）
+        
+        1. 変更を加える → `git add -A && git commit -m "feat: ..."`
+        2. プッシュ前に `pnpm run check`（Huskyで自動化可）
+        3. `git push`（= Vercel/サービス側で **Preview** 生成）
+        4. Preview で見た目・動作確認
+        5. 問題なければ **Promote to Production / 手動 Deploy**
+        6. 必要に応じてタグ付与（`v0.x.y`）
+        
+        ### 9. リスクと対策
+        
+        | リスク | 兆候 | 対策 |
+        | --- | --- | --- |
+        | 壊れた状態を本番へ反映 | プッシュ直後に障害 | 本番を**手動昇格**に固定、`check` でビルドエラーを抑止 |
+        | 見落とし | PreviewではOKだが本番だけ不具合 | 本番前に**環境変数/CORS**を再確認、簡易スモーク（/health, /projects） |
+        | 変更範囲が肥大化 | コミットが大きすぎて差分把握困難 | 作業を**小さく分割**、必要時のみ短命ブランチ |
+        
+        ### 10. 補足（推奨設定）
+        
+        - **main ブランチ保護**（GitHub → Settings → Branches）：
+            - 「直push可」でも、**Status checks**（任意のCI）を将来有効化すると安心
+        - **モノレポ設定**：
+            - Vercel（frontend/**Root Directory** を `frontend/`）
+            - Railway/Render（**Build/Root** を `backend/` に設定）
+        ```
+        
+- 初回コミット
+- readme分割した
+    - 理由
+        - 長くて技術的な話とか多かった
+        - 採用者やクライアントがどんなのか分かりづらい
+    - 普通はdocsディレクトリに書くらしい
+- まずフロントエンド作る
+    - nextのセットアップはした
+    - フロントエンドだけ最初に進めようと思ったけど、gitの基準をルートにしているから、node_modulesとかがずっと差分にある
+    - .gitignore作るついでにルート環境整える
+- ルート環境
+    - 3ファイル作成
+        - .gitignore
+        - pacakage.json
+        - pnpm-workspace.yaml
+    - pnpm installで以下を生成
+        - node_modules
+        - pnpm-lock.yaml
+- フロントエンドの続きしようと思ったけどnpmで作られてた
+    - package-lock.jsonが生成されてたから気づいた
+    - リバートしてnpxではなく、pnpm dlxで行う
+- mainにマージしようとしてブランチ移したらrootの.gitignoreに記述がなくてnext-env.tsが差分に出てきた
+    - rootの.gitignoreに記述追加
+- ルートのセットアップとフロントエンドのセットアップを並行で行っていたため、pnpm-lock.yamlで競合起こした
+    - ルートにpnpm-lock.yamlがないブランチでpnpm dlx create-next-app@latestをしたため、ルートにpnpm-lock.yamlが作られる
+- ルートにpnpm-lock.yamlがある状態でnextを入れ直したら、ルートの方に変更加わった
+    - その代わりfrontendの方にpnpm-lock.yamlができない
+    - ものレポ構造だかららしい
+- shadcn/uiの初期セットアップをする
+    - pnpm dlx shadcn@latest init
+        - global.css変更
+            - css変数の追加
+        - components.jsonの追加
+            - 設定ファイル
+        - lib/utils.tsの追加
+            - ユーティリティ関数
+        - package.jsonの変更
+            - 依存関係の更新
+- 全てのページファイルを作成
+- Homeのfv作る
+- やっぱ、homeのモック作ってから各セクションを直していこう
+- fv
+    - min-heightを画面の高さにしたい
+        - 単純にcalc(100vh-4rem)
+    - 背景の泡
+        - {[...Array(30)].map((_, i) => {
+            - Array(30)
+                - 30個の空の要素を持つ配列を作成
+                - 直接コンソールにうっても出る
+                    
+                    ![スクリーンショット 2025-08-27 19.52.19.png](attachment:263006bc-2b63-4b1f-8773-5d4a01f01b0a:スクリーンショット_2025-08-27_19.52.19.png)
+                    
+            - [...Array(30)]
+                - スプレッド演算子で展開
+                    - スプレッド演算子とは
+                        - 配列の展開
+                            
+                            ```jsx
+                            const fruits = ['りんご', 'バナナ', 'オレンジ'];
+                            
+                            // スプレッド演算子で展開
+                            console.log(...fruits);
+                            // りんご バナナ オレンジ
+                            
+                            // 配列の中に展開
+                            const newFruits = [...fruits, 'ぶどう'];
+                            // ['りんご', 'バナナ', 'オレンジ', 'ぶどう']
+                            ```
+                            
+                        - 配列のコピー
+                            
+                            ```jsx
+                            const original = [1, 2, 3];
+                            const copy = [...original];  // 新しい配列を作成
+                            
+                            console.log(copy);  // [1, 2, 3]
+                            console.log(original === copy);  // false（別の配列）
+                            ```
+                            
+                        - 配列の結合
+                            
+                            ```jsx
+                            const array1 = [1, 2, 3];
+                            const array2 = [4, 5, 6];
+                            
+                            const combined = [...array1, ...array2];
+                            // [1, 2, 3, 4, 5, 6]
+                            ```
+                            
+            - .map((_, i)⇒{}
+                
+                ```jsx
+                array.map((element, index, array) => {
+                  // element: 配列の要素
+                  // index: 要素のインデックス（0, 1, 2, ...）
+                  // array: 元の配列（通常は使わない）
+                })
+                ```
+                
+                - なぜ_を使う？
+                    - **_**: 使わない引数を表す慣習
+                    - **可読性**: 「この引数は使わない」と明示
+                    - **ESLint**: 未使用変数の警告を回避
+        - class
+            - **bg-gradient-to-br**
+                - **bg-gradient**: グラデーション背景
+                - **to-br**: 左上から右下へのグラデーション
+            - **from-blue-50 via-cyan-50 to-teal-50**
+                - **from-blue-50**: 開始色（薄い青）
+                - **via-cyan-50**: 中間色（薄いシアン）
+                - **to-teal-50**: 終了色（薄いティール）
+            - **rounded-full**
+                - **効果**: 完全な円形
+                - **CSS**: border-radius: 9999px
+            - **border-2**
+                - **効果**: 2pxの枠線
+                - **CSS**: border-width: 2px
+            - **border-blue-200/40**
+                - **border-blue-200**: 青い枠線
+                - **/40**: 40%の透明度（0.4）
+            - **animate-bubble-float**
+                - **効果**: カスタムアニメーション
+                - **CSS**: @keyframes bubble-floatを適用
+        - classとstyleで分ける理由
+            
+            ```jsx
+            <div
+              key={i}
+              className="absolute rounded-full border-2 border-blue-200/40 animate-bubble-float"
+              style={{
+                width: `${size}px`,
+                height: `${size}px`,
+                top: `${Math.random() * 100}%`,
+                left: `${Math.random() * 100}%`,
+                background: `radial-gradient(circle at 30% 30%, rgba(255,255,255,0.9), rgba(59,130,246,0.15))`,
+                boxShadow: `inset 0 2px 4px rgba(255,255,255,0.4), 0 2px 8px rgba(59,130,246,0.3)`,
+                animationDelay: `${Math.random() * 3}s`,
+                animationDuration: `${3 + Math.random() * 2}s`
+              }}
+            />
+            ```
+            
+            - className
+                - tailwindCSSは、ビルド時に静的なクラス名を生成するから
+                    - math.randomが使えない
+                    - テンプレートが使えない
+            - と思いきや、実はtaiwlindで完結可能
+                - 方法
+                    
+                    ## 1) グローバルCSS（`globals.css` 等）
+                    
+                    ```css
+                    @layer utilities {
+                      /* 影・グラデを再利用できるユーティリティに */
+                      .bg-bubble {
+                        background: radial-gradient(circle at 30% 30%, rgba(255,255,255,.9), rgba(59,130,246,.15));
+                      }
+                      .shadow-bubble {
+                        box-shadow: inset 0 2px 4px rgba(255,255,255,.4), 0 2px 8px rgba(59,130,246,.3);
+                      }
+                    
+                      /* アニメーション（CSS変数でduration/delayを動的に） */
+                      .animate-bubble-float {
+                        animation: bubble-float var(--dur,4s) ease-in-out infinite alternate;
+                        animation-delay: var(--delay,0s);
+                      }
+                      @keyframes bubble-float {
+                        0%   { transform: translateY(6%)  scale(1); }
+                        100% { transform: translateY(-6%) scale(1.02); }
+                      }
+                    
+                      @media (prefers-reduced-motion: reduce) {
+                        .animate-bubble-float { animation: none; }
+                      }
+                    }
+                    
+                    ```
+                    
+                    ---
+                    
+                    ## 2) JSX（`style`はCSS変数だけにして、残りはTailwind）
+                    
+                    ```jsx
+                    <div
+                      key={i}
+                      style={{
+                        '--size':  `${size}px`,
+                        '--top':   `${Math.random()*100}%`,
+                        '--left':  `${Math.random()*100}%`,
+                        '--delay': `${Math.random()*3}s`,
+                        '--dur':   `${3 + Math.random()*2}s`,
+                      }}
+                      className="
+                        absolute rounded-full border-2 border-blue-200/40
+                        w-[var(--size)] h-[var(--size)] top-[var(--top)] left-[var(--left)]
+                        bg-bubble shadow-bubble animate-bubble-float pointer-events-none
+                      "
+                    />
+                    
+                    ```
+                    
+        - Link
+            - importして使う
+            - メリット
+                
+                ### 1. **クライアントサイド遷移で速い**
+                
+                - `Link` は JavaScript を使ってページ遷移するから、ブラウザ全体のリロードが起きない。
+                - 結果、SPA（Single Page Application）っぽくスムーズにページが切り替わる。
+                - ページ全体の状態（ヘッダーやフッターの共通コンポーネントなど）がリセットされないからUXが良い。
+                
+                ### 2. **プリフェッチでさらに高速化**
+                
+                - `Link` に `prefetch` がデフォルトで効く（`next.config.js` で無効化できる）。
+                - ビューポートに表示されたリンク先ページをバックグラウンドで先読みするから、クリックした瞬間にほぼ読み込み済みで表示される。
+                
+                ### 3. **SEOに優しい**
+                
+                - 最終的には普通の `<a>` にレンダリングされるから、クローラーにも認識される。
+                - クライアントサイド遷移をしながらもSEOを犠牲にしない。
+                
+                ### 4. **ルーティングの恩恵を受けられる**
+                
+                - Next.js のファイルベースルーティングと連携して、`href="/about"` みたいに書くだけで正しく遷移できる。
+                - 相対パスや絶対パスを気にせずシンプルに書ける。
+                
+                ### 5. **アクセシビリティ対応**
+                
+                - `Link` 内に `<a>` を正しくレンダリングするので、スクリーンリーダーやキーボード操作にもちゃんと対応。
+        - useclient
+            - いるとき
+                - React Hooks を使う：`useState / useEffect / useRef / useCallback / useMemo`
+                - ブラウザAPI：`window / document / localStorage / AudioContext / canvas` など
+                - DOMイベント：`onClick / onChange / onMouseEnter / onKeyDown` など
+                - JS制御のインタラクション：モーダル、トースト、ドラッグ、スクロール同期、three.js/Chart.js 初期化
+            - いらない時
+                - 表示専用（リスト・静的テキスト・カード）
+                - データ取得してそのまま描画（App Routerのサーバーコンポーネントに最適）
+                - **CSSだけ**で完結するインタラクション（`:hover`, `:focus-visible`, Tailwindの`group-hover` / `peer-*`）
+            - コンポーネントを分けると適切な箇所にuse clientをつけれる
+        - const [bubbles, setBubbles] = useState<Bubble[]>([])
+            - なぜ[]の前にBubbleをつけているのか？
+                - 上部にBubble型が定義されている
+                    - Bubble型
+                        
+                        ```tsx
+                        type Bubble = {
+                          id: number
+                          size: number
+                          top: number
+                          left: number
+                          delay: number
+                          dur: number
+                          drift: number
+                          blur: number
+                          popping?: boolean
+                        }
+                        ```
+                        
+                    - typeとinterfaceの違い
+                        - **どちらでも動作する**
+                        - type = シンプルで柔軟、複雑な型の組み合わせに適している
+                        - interface = 拡張しやすい、オブジェクト指向的な設計に適している
+                - Bubble[] は「Bubble型のオブジェクトの配列」を意味する
+                    - 例
+                        
+                        ```tsx
+                        const bubbles: Bubble[] = [
+                          {
+                            id: 0,
+                            size: 30,
+                            top: 20,
+                            left: 30,
+                            delay: 0.5,
+                            dur: 4,
+                            drift: 2,
+                            blur: 0,
+                            popping: false
+                          },
+                          {
+                            id: 1,
+                            size: 45,
+                            top: 60,
+                            left: 70,
+                            delay: 1.2,
+                            dur: 5,
+                            drift: -3,
+                            blur: 1,
+                            popping: false
+                          }
+                          // ... 他の泡
+                        ]
+                        ```
+                        
+                - useState:Bubble[]じゃだめ？
+                    - : = 変数の型
+                    - <> = 関数の型
+                    - useState は関数だから <> を使う！
+        - setBubbles(prev => prev.map(b => [b.id](http://b.id/) === id ? ({ ...b, popping: true }) : b))
+            - prevは何？
+                - Bubblesに入っている配列のこと
+        - popSound
+            - コード全様
+                
+                ```tsx
+                function usePopAudio() {
+                  const ctxRef = useRef<AudioContext | null>(null)
+                  useEffect(() => () => { ctxRef.current?.close() }, [])
+                  return useCallback(() => {
+                    const AC: any = (window as any).AudioContext || (window as any).webkitAudioContext
+                    if (!AC) return
+                    if (!ctxRef.current) ctxRef.current = new AC()
+                    const ctx = ctxRef.current!
+                    const t = ctx.currentTime
+                
+                    // “ポン”音：短いサイン波＋減衰
+                    const osc = ctx.createOscillator()
+                    const gain = ctx.createGain()
+                    osc.type = 'sine'
+                    osc.frequency.setValueAtTime(800, t)
+                    osc.frequency.exponentialRampToValueAtTime(1400, t + 0.03)
+                    gain.gain.setValueAtTime(0.0001, t)
+                    gain.gain.exponentialRampToValueAtTime(0.45, t + 0.005)
+                    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.1)
+                    osc.connect(gain).connect(ctx.destination)
+                    osc.start(t)
+                    osc.stop(t + 0.11)
+                  }, [])
+                }
+                ```
+                
+            - const popSound = usePopAudio()
+                - カスタムフックで、React が提供する組み込みフックとはまた別
+                - メリット
+                    - **複数のReact hooksをまとめることができる**
+                    - **View(コンポーネント)とロジックが分離できる**
+                        1. コンポーネントの関数の肥大化を抑えることができる
+                        2. ロジックの再利用性の向上
+                        3. テスタビリティの向上
+                - 一回popSoundに代入する理由
+                    - 作成を1度だけにして同じものを使い回すため
+                    - もし代入しなかったら、関数を呼び出すたび毎回作成される
+            - const ctxRef = useRef<AudioContext | null>(null)
+                - useRef
+                    - useRefは「再レンダリングされない状態を保持する箱」
+                    - 保持したいけどUI更新はない
+                    
+                    | 項目 | useState | useRef |
+                    | --- | --- | --- |
+                    | 値が変わったら再レンダリングする？ | ✅ する | ❌ しない |
+                    | 主な用途 | UIに関わる値（カウンター、入力内容など） | UIに直接関係ないものを保持（DOM要素、タイマーID、外部リソースなど） |
+                    | 初期値指定 | `useState(0)` | `useRef(0)` |
+                    - よくある使い道
+                        
+                        ### ① DOM要素への参照
+                        
+                        ```tsx
+                        const inputRef = useRef<HTMLInputElement>(null)
+                        
+                        <input ref={inputRef} />
+                        <button onClick={() => inputRef.current?.focus()}>
+                          フォーカスする
+                        </button>
+                        
+                        ```
+                        
+                        👉 `inputRef.current` にその要素が入る。
+                        
+                        ---
+                        
+                        ### ② 外部リソースやインスタンスの保持
+                        
+                        ```tsx
+                        const ctxRef = useRef<AudioContext | null>(null)
+                        if (!ctxRef.current) ctxRef.current = new AudioContext()
+                        
+                        ```
+                        
+                        👉 AudioContextを毎回 `new` せず、同じインスタンスを使い回せる。
+                        
+                        ---
+                        
+                        ### ③ レンダリングに関係ない値の保持
+                        
+                        ```tsx
+                        const countRef = useRef(0)
+                        
+                        const handleClick = () => {
+                          countRef.current += 1
+                          console.log("クリック数:", countRef.current)
+                        }
+                        
+                        ```
+                        
+                        👉 クリック数を数えるけどUIには出さない、とかに使える。
+                        
+                - useEffect(() => () => { ctxRef.current?.close() }, [])
+                    - 展開すると以下になる
+                        
+                        ```jsx
+                        useEffect(() => {
+                          // マウント時の処理（今回は何もない）
+                        
+                          return () => {
+                            ctxRef.current?.close()
+                          }
+                        }, [])
+                        ```
+                        
+                    - `() => () => { ctxRef.current?.close() }`
+                        
+                        は「何もせずに**クリーンアップ関数を返すだけの関数**」
+                        
+                - return useCallback(() => {})
+                    - カスタムフックの returnはただの関数
+                    - Reactは「再レンダリングが走るたびに関数コンポーネント全体が呼ばれる」から、その中で定義した関数は **毎回新しく生成される**。
+                        - useCallbackで囲んでいる関数は関数コンポーネント内のpopSoundに格納される
+                            
+                            ```jsx
+                            export default function Home() {
+                              const [hoveredProject, setHoveredProject] = useState<number | null>(null)
+                              const [bubbles, setBubbles] = useState<Bubble[]>([])
+                              const [bursts, setBursts] = useState<Burst[]>([])
+                              const sceneRef = useRef<HTMLDivElement | null>(null)
+                              const popSound = usePopAudio()
+                            	...
+                            ```
+                            
+                            これはHomeの中にあるので、usePopAudio()の返り値がuseCallbackで囲まれておらず、Homeが再レンダリングされると、popSoundも新しく作られる。
+                            
+                    - useCallbackあり/なしの違い
+                        
+                        ❌ useCallbackナシの例
+                        
+                        ```jsx
+                        import { useState } from "react"
+                        
+                        function Child({ onClick }: { onClick: () => void }) {
+                          console.log("👶 Child レンダリング")
+                          return <button onClick={onClick}>子ボタン</button>
+                        }
+                        
+                        const MemoChild = React.memo(Child)
+                        
+                        export default function App() {
+                          const [count, setCount] = useState(0)
+                        
+                          // ❌ 毎回新しい関数が作られる
+                          const handleClick = () => {
+                            console.log("clicked")
+                          }
+                        
+                          return (
+                            <div>
+                              <p>count: {count}</p>
+                              <button onClick={() => setCount(c => c + 1)}>親カウント+1</button>
+                              <MemoChild onClick={handleClick} />
+                            </div>
+                          )
+                        }
+                        ```
+                        
+                        ✅ useCallbackアリの例
+                        
+                        ```jsx
+                        import { useState, useCallback } from "react"
+                        
+                        function Child({ onClick }: { onClick: () => void }) {
+                          console.log("👶 Child レンダリング")
+                          return <button onClick={onClick}>子ボタン</button>
+                        }
+                        
+                        const MemoChild = React.memo(Child)
+                        
+                        export default function App() {
+                          const [count, setCount] = useState(0)
+                        
+                          // ✅ useCallbackで関数を固定
+                          const handleClick = useCallback(() => {
+                            console.log("clicked")
+                          }, [])
+                        
+                          return (
+                            <div>
+                              <p>count: {count}</p>
+                              <button onClick={() => setCount(c => c + 1)}>親カウント+1</button>
+                              <MemoChild onClick={handleClick} />
+                            </div>
+                          )
+                        }
+                        
+                        ```
+                        
+                -
