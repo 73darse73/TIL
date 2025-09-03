@@ -2347,12 +2347,131 @@ pnpm -C backend prisma db push
                             - const ctxRef = useRef<AudioContext | null>(null)
                         - これが無いとctx.start()をしてもエラーになる
                             - ctxがnullの可能性があるため
-                                - nullの可能性があるときに操作をしようとしてもエラーになる
-                                    
-                                    ```jsx
-                                    let value: string | null
-                                    value.length
-                                    //value が string なら .length は OK
-                                    //value が null なら .length は 存在しないプロパティ
-                                    //だから「もし null だったら実行時エラーになるかも」と警告してくれる。
-                                    ```
+                            - nullの可能性があるときに操作をしようとしてもエラーになる
+                                
+                                ```jsx
+                                let value: string | null
+                                value.length
+                                //value が string なら .length は OK
+                                //value が null なら .length は 存在しないプロパティ
+                                //だから「もし null だったら実行時エラーになるかも」と警告してくれる。
+                                ```
+                                
+                    - const osc = ctx.createOscillator()
+                        - `osc` → **OscillatorNode**（発振器）。音の波を生成する
+                    - const gain = ctx.createGain()
+                        - `gain` → **GainNode**（音量ノード）。音量を調整する
+                    - osc.type = 'sine’
+                        - `osc.type` は発振器の波形（音色）を決める
+                        - 選べる値：
+                            - `'sine'` → サイン波（純音、柔らかい音）
+                            - `'square'` → 矩形波（ブザーっぽい）
+                            - `'sawtooth'` → ノコギリ波（鋭い音）
+                            - `'triangle'` → 三角波（丸い音）
+                            - `'custom'` → 自分で波形を定義
+                        - 今回は `'sine'` で「ポーン」という柔らかい電子音を作ってる。
+                    - osc.frequency.setValueAtTime(800, t)
+                    - osc.frequency.exponentialRampToValueAtTime(1400, t + 0.03)
+                        - `osc.frequency` → 発振器の「周波数」を表す `AudioParam`
+                        - 800Hz からスタートし、0.03秒で 1400Hz まで変化する
+                        - 他に使えるメソッド
+                            - `setValueAtTime(value, when)` → 指定時刻に値をセット
+                            - `linearRampToValueAtTime(value, when)` → 線形に変化
+                            - `exponentialRampToValueAtTime(value, when)` → 指数的に変化（自然な音の変化に近い）
+                            - `setTargetAtTime(value, when, timeConstant)` → 指定値に徐々に近づく
+                            - `setValueCurveAtTime(values[], start, duration)` → 波形に沿って変化
+                        - 800Hz → 1400Hz に上がるので「ピュッ」と高くなる効果音になる。
+                    - gain.gain.setValueAtTime(0.0001, t)
+                    - gain.gain.exponentialRampToValueAtTime(0.45, t + 0.005)
+                    - gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.1)
+                        - `gain.gain` → 音量を表す `AudioParam`
+                        - ステップごとの意味：
+                            1. **0.0001**（無音に近い）で開始
+                            2. **0.005秒後に 0.45 まで一気に上がる**
+                            3. **0.1秒後に 0.0001 まで下がって消える**
+                        - これで「パンッ」と一瞬で鳴ってスッと消える。
+                        - 他の値の使い方
+                            - 1.0 → 通常の音量
+                            - 0.5 → 半分の音量
+                            - 2.0 → 2倍の音量（クリップする場合あり）
+                    - osc.connect(gain).connect(ctx.destination)
+                        - `osc`（音源） → `gain`（音量調整） → `ctx.destination`（スピーカー出力）
+                        - `ctx.destination` は AudioContext の「最終出力」
+                        - Web Audio API の流れ
+                            
+                            ## 1. 最低限の構成
+                            
+                            音を出すだけなら実はこれで十分👇
+                            
+                            ```
+                            [OscillatorNode] → [スピーカー(ctx.destination)]
+                            ```
+                            
+                            ```tsx
+                            const osc = ctx.createOscillator()
+                            osc.connect(ctx.destination)
+                            osc.start()
+                            ```
+                            
+                            👉 ただしこの場合は「音量調整ができない」。
+                            
+                            ずっと同じ大きさで鳴りっぱなし。
+                            
+                            ---
+                            
+                            ## 2. GainNode を挟む理由
+                            
+                            ```
+                            [OscillatorNode] → [GainNode] → [スピーカー]
+                            ```
+                            
+                            - 音量を変化させたり（フェードイン/アウト）
+                            - 複数の音源をミックスして調整したり
+                            
+                            するために GainNode をよく挟む。
+                            
+                            ---
+                            
+                            ## 3. 他の例（組み合わせ自由！）
+                            
+                            Web Audio API の強みは「ノードを自由に繋げる」こと。
+                            
+                            ### フィルタを挟む
+                            
+                            ```
+                            [OscillatorNode] → [BiquadFilterNode] → [GainNode] → [スピーカー]
+                            ```
+                            
+                            👉 エコー、低音強調、ラジオっぽい音など
+                            
+                            ### エフェクトチェーン
+                            
+                            ```
+                            [OscillatorNode] → [DelayNode] → [ConvolverNode] → [GainNode] → [スピーカー]
+                            ```
+                            
+                            👉 ディレイ（やまびこ）やリバーブ（残響）
+                            
+                            ### 複数音源をミックス
+                            
+                            ```
+                            [OscillatorNode] ─┐
+                            [AudioBufferSourceNode] ─┤ → [GainNode] → [スピーカー]
+                            [MediaElementAudioSourceNode] ─┘
+                            ```
+                            
+                            👉 複数の音をまとめて1つの出力に流す
+                            
+                            ---
+                            
+                            ## 4. まとめ
+                            
+                            - `[OscillatorNode] → [GainNode] → [スピーカー]` は「音を作って音量を調整して出す」という基本形
+                            - **絶対ではなく**、フィルタやエフェクトを挟んだり、複数音源を混ぜたり自由自在
+                            - GainNode を挟むのは「音量やフェードを制御したいから」
+                    - osc.start(t)
+                    - osc.stop(t + 0.11)
+                        - osc.start(when) → 指定した時刻に再生を開始
+                        - osc.stop(when) → 指定した時刻に再生を停止
+                    - ここでは 今すぐ再生して、0.11秒後に止める
+                    - 実際に鳴る音は「0.11秒だけの短いポン音」。
