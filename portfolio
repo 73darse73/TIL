@@ -2475,3 +2475,34 @@ pnpm -C backend prisma db push
                         - osc.stop(when) → 指定した時刻に再生を停止
                     - ここでは 今すぐ再生して、0.11秒後に止める
                     - 実際に鳴る音は「0.11秒だけの短いポン音」。
+- products
+    - `class=”group”`
+        - 親要素にgroup要素をつけ、子要素でgroup-hover:とすると、親要素にhoverした時、子要素も連動する。
+            
+            ```jsx
+            <a href="#" class="group ...">
+              <div>
+                <svg class="stroke-sky-500 group-hover:stroke-white ..." fill="none" viewBox="0 0 24 24">
+                  <!-- ... -->
+                </svg>
+                <h3 class="text-gray-900 group-hover:text-white ...">New project</h3>
+              </div>
+              <p class="text-gray-500 group-hover:text-white ...">Create a new project from a variety of starting templates.</p>
+            </a>
+            ```
+            
+        - 他にも、、
+            - `group-focus:` → 親にフォーカスが当たったら適用
+            - `group-active:` → 親がクリック中のとき適用
+            - `group-[state]:` → 任意の `data-*` 属性や `aria-*` 属性に合わせて制御もできる
+        - `group/名前` で複数グループ管理
+            - Tailwind v3.2+ では `group/foo` のように名前付きグループを作れる。
+                
+                ```html
+                <div class="group/menu">
+                  <button>メニュー</button>
+                  <div class="hidden group-hover/menu:block">
+                    <!-- ドロップダウン内容 -->
+                  </div>
+                </div>
+                ```
